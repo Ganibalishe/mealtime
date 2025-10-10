@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://mealtime-planner.ru/sitemap.xml
+
+# SEO рекомендации
+Disallow: /api/
+Disallow: /login
+Disallow: /admin/
+
+# Разрешаем индексировать основные страницы
+Allow: /recipes/
+Allow: /shopping-list/

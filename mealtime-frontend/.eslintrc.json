@@ -1,0 +1,32 @@
+{
+    "env": {
+      "browser": true,
+      "es2021": true
+    },
+    "extends": [
+      "eslint:recommended",
+      "@typescript-eslint/recommended",
+      "plugin:react/recommended",
+      "plugin:react-hooks/recommended",
+      "prettier" // Должен быть последним, чтобы перезаписывать правила форматирования
+    ],
+    "parser": "@typescript-eslint/parser",
+    "parserOptions": {
+      "ecmaFeatures": {
+        "jsx": true
+      },
+      "ecmaVersion": 12,
+      "sourceType": "module"
+    },
+    "plugins": ["react", "@typescript-eslint", "prettier"],
+    "rules": {
+      "prettier/prettier": "error", // Помечает ошибки Prettier как ошибки ESLint
+      "react/react-in-jsx-scope": "off", // Не требует импорта React в новых версиях
+      "react/prop-types": "off" // Отключает проверку prop-types, т.к. используем TypeScript
+    },
+    "settings": {
+      "react": {
+        "version": "detect"
+      }
+    }
+  }
