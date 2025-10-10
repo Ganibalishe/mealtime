@@ -1,0 +1,35 @@
+cat > .gitignore << EOF
+# Django
+*.pyc
+__pycache__/
+*.sqlite3
+.env
+venv/
+.venv/
+db.sqlite3
+
+# React
+node_modules/
+dist/
+build/
+.env.local
+.env.production
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+temp/
+tmp/
+EOF

@@ -1,0 +1,14 @@
+{
+    "python.defaultInterpreterPath": "./venv/bin/python",
+    "editor.formatOnSave": true,
+    "python.formatting.provider": "black",
+    "editor.rulers": [150],
+    "files.trimTrailingWhitespace": true,
+    "editor.insertSpaces": true,
+    "editor.tabSize": 4,
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter"
+    },
+    "python.terminal.activateEnvironment": true,
+    "python.terminal.activateEnvInCurrentTerminal": true
+}
