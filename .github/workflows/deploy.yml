@@ -1,0 +1,39 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Deploy to server
+      uses: appleboy/ssh-action@v0.1.7
+      with:
+        host: "79.174.78.237"
+        username: root
+        key: ${{ secrets.SERVER_SSH_KEY }}
+        script: |
+          cd /var/www/mealtime
+          git pull origin main
+
+          # Backend setup
+          source venv/bin/activate
+          pip install -r requirements.txt
+          python manage.py migrate
+          python manage.py collectstatic --noinput
+
+          # Frontend setup
+          cd mealtime-frontend
+          npm install
+          npm run build
+
+          # Restart services
+          sudo systemctl restart mealtime
+          sudo systemctl restart nginx
+
+          echo "🚀 Deployment completed successfully!"
