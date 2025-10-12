@@ -15,7 +15,7 @@ jobs:
       uses: appleboy/ssh-action@v0.1.7
       with:
         host: "79.174.78.237"
-        username: root
+        username: www-data
         key: ${{ secrets.SERVER_SSH_KEY }}
         script: |
           cd /var/www/mealtime
