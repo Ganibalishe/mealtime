@@ -287,7 +287,6 @@ class ShoppingListViewSet(viewsets.ModelViewSet):
             )
 
         try:
-            # Используем улучшенную логику
             shopping_list, action = get_or_create_shopping_list(
                 user=request.user,
                 start_date=start_date,
