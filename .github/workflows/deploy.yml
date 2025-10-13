@@ -34,6 +34,7 @@ jobs:
 
           # Frontend setup
           cd mealtime-frontend
+          echo "VITE_API_URL=/api" > .env.production
           npm install
           npm run build
 
