@@ -19,21 +19,19 @@ jobs:
         key: ${{ secrets.SERVER_SSH_KEY }}
         script: |
           cd /var/www/mealtime
-
-          # Принудительное обновление кода
           git fetch --all
           git reset --hard origin/main
           git pull origin main
 
           # Backend setup
-          cd /var/www/mealtime
           source venv/bin/activate
           pip install -r requirements.txt
           python manage.py migrate
           python manage.py collectstatic --noinput
 
-          # Frontend setup
+          # Frontend setup - СОВМЕСТИМОСТЬ С REACT 19
           cd mealtime-frontend
+
           # Исправляем package.json если есть проблемные зависимости
           if grep -q "npm:rolldown-vite" package.json; then
             echo "🛠️ Fixing package.json..."
@@ -41,7 +39,8 @@ jobs:
             # Удаляем секцию overrides если она есть
             sed -i '/"overrides": {/,/}/d' package.json
           fi
-          # Очищаем кэш и переустанавливаем зависимости
+
+          # Очищаем и переустанавливаем с legacy-peer-deps для React 19
           npm cache clean --force
           rm -rf node_modules
           rm -f package-lock.json
