@@ -34,6 +34,13 @@ jobs:
 
           # Frontend setup
           cd mealtime-frontend
+          # Исправляем package.json если есть проблемные зависимости
+          if grep -q "npm:rolldown-vite" package.json; then
+            echo "🛠️ Fixing package.json..."
+            sed -i 's/"vite": "npm:rolldown-vite@[^"]*"/"vite": "^5.0.0"/g' package.json
+            # Удаляем секцию overrides если она есть
+            sed -i '/"overrides": {/,/}/d' package.json
+          fi
           # Очищаем кэш и переустанавливаем зависимости
           npm cache clean --force
           rm -rf node_modules
