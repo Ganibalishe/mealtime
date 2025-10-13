@@ -10,7 +10,7 @@ SECRET_KEY = "ваш-секретный-ключ-здесь"  # Замените
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["localhost", "127.0.0.1", "0.0.0.0"]
+ALLOWED_HOSTS = ["localhost", "127.0.0.1", "0.0.0.0", "mealtime-planner.ru"]
 
 # Application definition
 INSTALLED_APPS = [
