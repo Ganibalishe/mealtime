@@ -45,7 +45,7 @@ jobs:
           npm cache clean --force
           rm -rf node_modules
           rm -f package-lock.json
-          npm install
+          npm install --legacy-peer-deps
           export VITE_API_URL=/api
           npm run build
 
