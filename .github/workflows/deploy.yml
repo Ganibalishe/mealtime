@@ -34,8 +34,12 @@ jobs:
 
           # Frontend setup
           cd mealtime-frontend
-          echo "VITE_API_URL=/api" > .env.production
+          # Очищаем кэш и переустанавливаем зависимости
+          npm cache clean --force
+          rm -rf node_modules
+          rm -f package-lock.json
           npm install
+          export VITE_API_URL=/api
           npm run build
 
           # Restart services
