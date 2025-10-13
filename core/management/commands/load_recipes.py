@@ -1,7 +1,7 @@
 import json
 import os
 from django.core.management.base import BaseCommand
-from django.db import transaction
+from django.db import transaction, models
 from core.models import (
     IngredientCategory, CookingMethod, Ingredient, Tag,
     Recipe, RecipeIngredient
