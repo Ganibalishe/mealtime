@@ -29,18 +29,15 @@ jobs:
           python manage.py migrate
           python manage.py collectstatic --noinput
 
-          # Frontend setup - СОВМЕСТИМОСТЬ С REACT 19
+          # Frontend setup - с Node.js 20
           cd mealtime-frontend
 
-          # Исправляем package.json если есть проблемные зависимости
-          if grep -q "npm:rolldown-vite" package.json; then
-            echo "🛠️ Fixing package.json..."
-            sed -i 's/"vite": "npm:rolldown-vite@[^"]*"/"vite": "^5.0.0"/g' package.json
-            # Удаляем секцию overrides если она есть
-            sed -i '/"overrides": {/,/}/d' package.json
-          fi
+          # Активируем Node.js 20
+          export NVM_DIR="/root/.nvm"
+          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+          nvm use 20
 
-          # Очищаем и переустанавливаем с legacy-peer-deps для React 19
+          # Очищаем и переустанавливаем
           npm cache clean --force
           rm -rf node_modules
           rm -f package-lock.json
