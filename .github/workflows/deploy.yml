@@ -19,9 +19,14 @@ jobs:
         key: ${{ secrets.SERVER_SSH_KEY }}
         script: |
           cd /var/www/mealtime
+
+          # Принудительное обновление кода
+          git fetch --all
+          git reset --hard origin/main
           git pull origin main
 
           # Backend setup
+          cd /var/www/mealtime
           source venv/bin/activate
           pip install -r requirements.txt
           python manage.py migrate
@@ -33,7 +38,7 @@ jobs:
           npm run build
 
           # Restart services
-          sudo systemctl restart mealtime
-          sudo systemctl restart nginx
+          systemctl restart mealtime
+          systemctl restart nginx
 
           echo "🚀 Deployment completed successfully!"
