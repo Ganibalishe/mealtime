@@ -1,4 +1,4 @@
-// components/Layout.tsx - С ОРИГИНАЛЬНЫМИ ЦВЕТАМИ
+// components/Layout.tsx - ИСПРАВЛЕННАЯ ВЕРСИЯ
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
@@ -239,8 +239,8 @@ const Layout: React.FC<LayoutProps> = ({ children, variant = 'default' }) => {
         </div>
       </nav>
 
-      {/* Основной контент */}
-      <main className={`flex-1 ${variant === 'default' ? 'py-6' : 'flex items-center justify-center'}`}>
+      {/* Основной контент - ИСПРАВЛЕНА ЧАСТЬ ДЛЯ AUTH СТРАНИЦ */}
+      <main className={`flex-1 ${variant === 'default' ? 'py-6' : 'flex items-center justify-center py-12'}`}>
         {variant === 'default' ? (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="bg-white rounded-lg shadow-sm border border-neutral-200 p-4 sm:p-6 fade-in">
@@ -248,8 +248,8 @@ const Layout: React.FC<LayoutProps> = ({ children, variant = 'default' }) => {
             </div>
           </div>
         ) : (
-          // Для auth страниц - полная ширина и центрирование
-          <div className="w-full py-12 px-4 sm:px-6 lg:px-8">
+          // Для auth страниц - центрирование по горизонтали и вертикали
+          <div className="w-full max-w-md mx-auto px-4 sm:px-6 lg:px-8">
             {children}
           </div>
         )}
