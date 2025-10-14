@@ -1,3 +1,4 @@
+// hooks/useAuth.ts - ОРИГИНАЛЬНАЯ ВЕРСИЯ
 import { useState, useEffect } from 'react';
 
 export const useAuth = () => {

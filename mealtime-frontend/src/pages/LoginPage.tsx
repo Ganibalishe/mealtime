@@ -1,3 +1,4 @@
+// pages/LoginPage.tsx - ОРИГИНАЛЬНАЯ ВЕРСИЯ
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { authService } from '../services/api';
@@ -21,23 +22,43 @@ const LoginPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('🔐 Форма отправлена', {
+      username: formData.username,
+      password: '***' // Не логируем пароль, только длину
+    });
+
     setError('');
     setIsLoading(true);
 
     try {
+      console.log('🔄 Отправка запроса на /api/auth/token/...');
+
       const response = await authService.login(formData.username, formData.password);
+      console.log('✅ Успешный ответ:', response.data);
 
       localStorage.setItem('accessToken', response.data.access);
       localStorage.setItem('refreshToken', response.data.refresh);
 
+      console.log('🔄 Токены сохранены, редирект...');
       navigate('/');
+
     } catch (err: any) {
+      console.log('❌ Ошибка авторизации:', err);
+
+      // Детальный разбор ошибки
+      if (err.response) {
+        console.log('📊 Статус ошибки:', err.response.status);
+        console.log('📊 Данные ошибки:', err.response.data);
+        console.log('📊 Заголовки запроса:', err.response.config?.headers);
+        console.log('📊 URL запроса:', err.response.config?.url);
+        console.log('📊 Данные запроса:', err.response.config?.data);
+      }
+
       setError(err.response?.data?.detail || 'Ошибка входа. Проверьте логин и пароль.');
     } finally {
       setIsLoading(false);
     }
   };
-
   return (
     <Layout variant="auth">
       <div className="max-w-md w-full space-y-8">

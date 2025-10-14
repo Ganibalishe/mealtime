@@ -1,3 +1,4 @@
+// components/Layout.tsx - С ОРИГИНАЛЬНЫМИ ЦВЕТАМИ
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
@@ -107,7 +108,7 @@ const Layout: React.FC<LayoutProps> = ({ children, variant = 'default' }) => {
 
   return (
     <div className="min-h-screen flex flex-col bg-page">
-      {/* Навигация - ВОЗВРАЩАЕМ ОРИГИНАЛЬНЫЕ ЦВЕТА */}
+      {/* Навигация с оригинальными цветами */}
       <nav className="bg-primary-500 shadow-sm border-b border-primary-600">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">

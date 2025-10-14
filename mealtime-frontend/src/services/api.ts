@@ -20,25 +20,26 @@ const api = axios.create({
 });
 
 // Функция для обновления токена
-const refreshAuthToken = async () => {
+const refreshAuthToken = async (): Promise<string> => {
   const refreshToken = localStorage.getItem('refreshToken');
+
   if (!refreshToken) {
-    throw new Error('No refresh token');
+    throw new Error('No refresh token available');
   }
 
   try {
-    const response = await axios.post(`${API_BASE_URL}/auth/token/refresh/`, {
-      refresh: refreshToken,
+    const response = await api.post('/auth/token/refresh/', {
+      refresh: refreshToken
     });
 
-    const { access } = response.data;
-    localStorage.setItem('accessToken', access);
-    return access;
+    const newAccessToken = response.data.access;
+    localStorage.setItem('accessToken', newAccessToken);
+
+    return newAccessToken;
   } catch (error) {
-    // Если refresh токен невалиден, разлогиниваем пользователя
+    // Если refresh не удался, очищаем оба токена
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
-    window.location.href = '/login';
     throw error;
   }
 };
@@ -58,8 +59,11 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // Если ошибка 401 и это не запрос на обновление токена
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // ИСКЛЮЧАЕМ запросы аутентификации из логики обновления токена
+    const isAuthRequest = originalRequest.url?.includes('/auth/token/');
+
+    // Если ошибка 401, это не запрос аутентификации, и мы еще не повторяли запрос
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthRequest) {
       originalRequest._retry = true;
 
       try {
@@ -67,12 +71,15 @@ api.interceptors.response.use(
         originalRequest.headers.Authorization = `Bearer ${newToken}`;
         return api(originalRequest);
       } catch (refreshError) {
-        // Если обновление токена не удалось, перенаправляем на логин
-        window.location.href = '/login';
+        // Если обновление токена не удалось, очищаем токены но НЕ перенаправляем
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        window.dispatchEvent(new Event('authChange'));
         return Promise.reject(refreshError);
       }
     }
 
+    // Для запросов аутентификации или других ошибок - просто отклоняем промис
     return Promise.reject(error);
   }
 );
@@ -185,12 +192,20 @@ export const ingredientService = {
 };
 
 export const authService = {
-  login: (username: string, password: string) =>
-    api.post('/auth/token/', { username, password }),
-  register: (userData: { username: string; email: string; password: string }) =>
-    api.post('/auth/register/', userData),
-  refreshToken: (refresh: string) =>
-    api.post('/auth/token/refresh/', { refresh }),
+  login: async (username: string, password: string) => {
+    console.log('📤 Отправка запроса на аутентификацию...');
+    const response = await api.post('/auth/token/', {
+      username,
+      password,
+    });
+    return response;
+  },
+
+  register: async (userData: { username: string; email: string; password: string }) => {
+    const response = await api.post('/auth/register/', userData);
+    return response;
+  },
+
   logout: () => {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
