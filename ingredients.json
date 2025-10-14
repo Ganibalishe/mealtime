@@ -1,0 +1,157 @@
+[
+    {
+      "name": "Яйца куриные",
+      "category": "Яйца",
+      "default_unit": "pcs"
+    },
+    {
+      "name": "Молоко",
+      "category": "Молочные продукты",
+      "default_unit": "ml"
+    },
+    {
+      "name": "Сыр твердый",
+      "category": "Сыры",
+      "default_unit": "g"
+    },
+    {
+      "name": "Масло сливочное",
+      "category": "Масла и жиры",
+      "default_unit": "g"
+    },
+    {
+      "name": "Соль",
+      "category": "Специи и травы",
+      "default_unit": "pinch"
+    },
+    {
+      "name": "Овсяные хлопья",
+      "category": "Крупы и макароны",
+      "default_unit": "g"
+    },
+    {
+      "name": "Сахар",
+      "category": "Специи и травы",
+      "default_unit": "g"
+    },
+    {
+      "name": "Мука",
+      "category": "Мука и смеси",
+      "default_unit": "g"
+    },
+    {
+      "name": "Масло растительное",
+      "category": "Масла и жиры",
+      "default_unit": "ml"
+    },
+    {
+      "name": "Творог",
+      "category": "Молочные продукты",
+      "default_unit": "g"
+    },
+    {
+      "name": "Перец черный",
+      "category": "Специи и травы",
+      "default_unit": "pinch"
+    },
+    {
+      "name": "Хлеб белый",
+      "category": "Хлеб и выпечка",
+      "default_unit": "pcs"
+    },
+    {
+      "name": "Хлеб тостовый",
+      "category": "Хлеб и выпечка",
+      "default_unit": "pcs"
+    },
+    {
+      "name": "Манная крупа",
+      "category": "Крупы и макароны",
+      "default_unit": "g"
+    },
+    {
+      "name": "Помидоры",
+      "category": "Овощи и зелень",
+      "default_unit": "kg"
+    },
+    {
+      "name": "Лук репчатый",
+      "category": "Овощи и зелень",
+      "default_unit": "kg"
+    },
+    {
+      "name": "Авокадо",
+      "category": "Овощи и зелень",
+      "default_unit": "kg"
+    },
+    {
+      "name": "Лимон",
+      "category": "Фрукты и ягоды",
+      "default_unit": "kg"
+    },
+    {
+      "name": "Уксус",
+      "category": "Соусы и приправы",
+      "default_unit": "ml"
+    },
+    {
+      "name": "Гречка",
+      "category": "Крупы и макароны",
+      "default_unit": "g"
+    },
+    {
+      "name": "Рис",
+      "category": "Крупы и макароны",
+      "default_unit": "g"
+    },
+    {
+      "name": "Сметана",
+      "category": "Молочные продукты",
+      "default_unit": "g"
+    },
+    {
+      "name": "Грибы свежие",
+      "category": "Овощи и зелень",
+      "default_unit": "kg"
+    },
+    {
+      "name": "Бекон",
+      "category": "Мясо и птица",
+      "default_unit": "g"
+    },
+    {
+      "name": "Яблоки",
+      "category": "Фрукты и ягоды",
+      "default_unit": "kg"
+    },
+    {
+      "name": "Бананы",
+      "category": "Фрукты и ягды",
+      "default_unit": "kg"
+    },
+    {
+      "name": "Апельсины",
+      "category": "Фрукты и ягоды",
+      "default_unit": "kg"
+    },
+    {
+      "name": "Йогурт натуральный",
+      "category": "Молочные продукты",
+      "default_unit": "g"
+    },
+    {
+      "name": "Мед",
+      "category": "Сладости",
+      "default_unit": "g"
+    },
+    {
+      "name": "Кефир",
+      "category": "Молочные продукты",
+      "default_unit": "ml"
+    },
+    {
+      "name": "Сода",
+      "category": "Специи и травы",
+      "default_unit": "pinch"
+    }
+  ]
