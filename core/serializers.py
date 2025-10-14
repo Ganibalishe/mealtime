@@ -14,7 +14,27 @@ from .models import (
     Tag,
 )
 from django.contrib.auth.models import User
+from decimal import Decimal
 
+class FormattedDecimalField(serializers.DecimalField):
+    """Кастомное поле для отображения decimal без лишних нулей"""
+
+    def to_representation(self, value):
+        representation = super().to_representation(value)
+
+        if representation is None:
+            return representation
+
+        try:
+            decimal_value = Decimal(str(representation))
+            # Проверяем, является ли число целым
+            if decimal_value == decimal_value.to_integral_value():
+                return int(decimal_value)
+            else:
+                # Убираем лишние нули в конце
+                return representation.rstrip('0').rstrip('.') if '.' in representation else representation
+        except (ValueError, TypeError):
+            return representation
 
 # Базовые сериализаторы
 class UserSerializer(serializers.ModelSerializer):
@@ -56,11 +76,11 @@ class IngredientSerializer(serializers.ModelSerializer):
 # Рецепты
 class RecipeIngredientSerializer(serializers.ModelSerializer):
     ingredient_name = serializers.CharField(source="ingredient.name", read_only=True)
-    # Берем unit из ингредиента, а не из рецепта
     unit = serializers.CharField(source="ingredient.default_unit", read_only=True)
     unit_display = serializers.CharField(
         source="ingredient.get_default_unit_display", read_only=True
     )
+    quantity = FormattedDecimalField(max_digits=10, decimal_places=2)
 
     class Meta:
         model = RecipeIngredient
@@ -70,34 +90,7 @@ class RecipeIngredientSerializer(serializers.ModelSerializer):
             "ingredient_name",
             "quantity",
             "unit",
-            "unit_display",  # Теперь unit берется из ингредиента
-        ]
-
-
-class RecipeSerializer(serializers.ModelSerializer):
-    ingredients = RecipeIngredientSerializer(many=True, read_only=True)
-    cooking_method_name = serializers.CharField(
-        source="cooking_method.name", read_only=True
-    )
-    difficulty_display = serializers.CharField(
-        source="get_difficulty_display", read_only=True
-    )
-
-    class Meta:
-        model = Recipe
-        fields = [
-            "id",
-            "name",
-            "description",
-            "cooking_time",
-            "difficulty",
-            "difficulty_display",
-            "cooking_method",
-            "cooking_method_name",
-            "instructions",
-            "image",
-            "portions",
-            "ingredients",
+            "unit_display",
         ]
 
 
@@ -136,9 +129,9 @@ class MealPlanSerializer(serializers.ModelSerializer):
 class ShoppingListItemSerializer(serializers.ModelSerializer):
     ingredient_name = serializers.CharField(source="ingredient.name", read_only=True)
     category_name = serializers.CharField(source="category.name", read_only=True)
-    # Используем методы модели вместо прямого доступа к полям
     unit = serializers.CharField(source="get_unit", read_only=True)
     unit_display = serializers.CharField(source="get_unit_display", read_only=True)
+    quantity = FormattedDecimalField(max_digits=10, decimal_places=2)
 
     class Meta:
         model = ShoppingListItem
@@ -204,11 +197,11 @@ class ShoppingListCreateSerializer(serializers.ModelSerializer):
 # Шаблоны списков покупок
 class TemplateItemSerializer(serializers.ModelSerializer):
     ingredient_name = serializers.CharField(source="ingredient.name", read_only=True)
-    # Берем unit из ингредиента
     unit = serializers.CharField(source="ingredient.default_unit", read_only=True)
     unit_display = serializers.CharField(
         source="ingredient.get_default_unit_display", read_only=True
     )
+    quantity = FormattedDecimalField(max_digits=10, decimal_places=2)
 
     class Meta:
         model = TemplateItem
@@ -242,8 +235,6 @@ class ShoppingListTemplateSerializer(serializers.ModelSerializer):
 
 # Фильтры для рецептов
 class RecipeFilterSerializer(serializers.Serializer):
-    """Сериализатор для фильтров рецептов"""
-
     cooking_method = serializers.CharField(required=False)
     difficulty = serializers.CharField(required=False)
     max_cooking_time = serializers.IntegerField(required=False)
@@ -251,8 +242,6 @@ class RecipeFilterSerializer(serializers.Serializer):
 
 
 class ShoppingListWithStatsSerializer(ShoppingListSerializer):
-    """Сериализатор списка покупок со статистикой"""
-
     statistics = serializers.SerializerMethodField()
 
     class Meta(ShoppingListSerializer.Meta):
@@ -274,7 +263,6 @@ class TagSerializer(serializers.ModelSerializer):
 
 
 class RecipeSerializer(serializers.ModelSerializer):
-    # ДОБАВЛЕНО: поле тегов
     tags = TagSerializer(many=True, read_only=True)
     tag_ids = serializers.PrimaryKeyRelatedField(
         many=True,
@@ -283,8 +271,6 @@ class RecipeSerializer(serializers.ModelSerializer):
         write_only=True,
         required=False,
     )
-
-    # остальные поля остаются без изменений
     ingredients = RecipeIngredientSerializer(many=True, read_only=True)
     cooking_method_name = serializers.CharField(
         source="cooking_method.name", read_only=True
@@ -305,7 +291,7 @@ class RecipeSerializer(serializers.ModelSerializer):
             "cooking_method",
             "cooking_method_name",
             "tags",
-            "tag_ids",  # ДОБАВЛЕНО
+            "tag_ids",
             "instructions",
             "image",
             "portions",

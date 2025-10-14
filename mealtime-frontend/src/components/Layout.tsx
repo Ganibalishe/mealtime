@@ -1,19 +1,19 @@
-// components/Layout.tsx - ОБНОВЛЕННАЯ ВЕРСИЯ
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
 import { authService } from '../services/api';
-import { useAuth } from '../hooks/useAuth'; // Добавляем хук авторизации
+import { useAuth } from '../hooks/useAuth';
 
 interface LayoutProps {
   children: React.ReactNode;
+  variant?: 'default' | 'auth';
 }
 
-const Layout: React.FC<LayoutProps> = ({ children }) => {
+const Layout: React.FC<LayoutProps> = ({ children, variant = 'default' }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const isAuthenticated = useAuth(); // Проверяем авторизацию
+  const isAuthenticated = useAuth();
 
   const navigation = [
     { name: 'Календарь', href: '/', icon: '📅', mobileIcon: '📅' },
@@ -26,23 +26,99 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const handleLogout = () => {
     authService.logout();
     navigate('/');
-    window.location.reload(); // Обновляем страницу для сброса состояния
+    window.location.reload();
   };
 
+  // Футер для auth страниц (более простой)
+  const AuthFooter = () => (
+    <footer className="bg-white border-t border-gray-200 mt-auto">
+      <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
+        <div className="text-center">
+          <p className="text-gray-500 text-sm">
+            © {new Date().getFullYear()} Mealtime Planner. Все права защищены.
+          </p>
+        </div>
+      </div>
+    </footer>
+  );
+
+  // Основной футер
+  const MainFooter = () => (
+    <footer className="bg-white border-t border-gray-200 mt-auto">
+      <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Mealtime Planner</h3>
+            <p className="text-gray-600 text-sm">
+              Умный планировщик питания для всей семьи. Создавайте меню на неделю
+              и автоматически получайте списки покупок.
+            </p>
+          </div>
+
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Навигация</h3>
+            <ul className="space-y-2 text-sm">
+              <li>
+                <Link to="/" className="text-gray-600 hover:text-gray-900">
+                  Главная
+                </Link>
+              </li>
+              <li>
+                <Link to="/recipes" className="text-gray-600 hover:text-gray-900">
+                  Все рецепты
+                </Link>
+              </li>
+              {!isAuthenticated && (
+                <>
+                  <li>
+                    <Link to="/login" className="text-gray-600 hover:text-gray-900">
+                      Вход
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/register" className="text-gray-600 hover:text-gray-900">
+                      Регистрация
+                    </Link>
+                  </li>
+                </>
+              )}
+            </ul>
+          </div>
+
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Возможности</h3>
+            <ul className="space-y-2 text-sm text-gray-600">
+              <li>📅 Планирование питания</li>
+              <li>🛒 Списки покупок</li>
+              <li>🍳 Библиотека рецептов</li>
+              <li>👨‍👩‍👧‍👦 Для всей семьи</li>
+            </ul>
+          </div>
+        </div>
+
+        <div className="border-t border-gray-200 mt-8 pt-8 text-center">
+          <p className="text-gray-500 text-sm">
+            © {new Date().getFullYear()} Mealtime Planner. Все права защищены.
+          </p>
+        </div>
+      </div>
+    </footer>
+  );
+
   return (
-    <div className="min-h-screen bg-page">
-      {/* Навигация */}
+    <div className="min-h-screen flex flex-col bg-page">
+      {/* Навигация - ВОЗВРАЩАЕМ ОРИГИНАЛЬНЫЕ ЦВЕТА */}
       <nav className="bg-primary-500 shadow-sm border-b border-primary-600">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             {/* Логотип и бренд */}
             <div className="flex items-center">
-              <div className="flex-shrink-0 flex items-center">
+              <Link to="/" className="flex-shrink-0 flex items-center">
                 <div className="h-8 w-8 bg-accent-500 rounded-lg flex items-center justify-center text-white font-bold mr-3">
                   🍽️
                 </div>
                 <h1 className="text-xl font-bold text-white">Mealtime Planner</h1>
-              </div>
+              </Link>
             </div>
 
             {/* Десктопное меню */}
@@ -163,11 +239,23 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       </nav>
 
       {/* Основной контент */}
-      <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        <div className="bg-white rounded-lg shadow-sm border border-neutral-200 p-4 sm:p-6 fade-in">
-          {children}
-        </div>
+      <main className={`flex-1 ${variant === 'default' ? 'py-6' : 'flex items-center justify-center'}`}>
+        {variant === 'default' ? (
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="bg-white rounded-lg shadow-sm border border-neutral-200 p-4 sm:p-6 fade-in">
+              {children}
+            </div>
+          </div>
+        ) : (
+          // Для auth страниц - полная ширина и центрирование
+          <div className="w-full py-12 px-4 sm:px-6 lg:px-8">
+            {children}
+          </div>
+        )}
       </main>
+
+      {/* Футер */}
+      {variant === 'auth' ? <AuthFooter /> : <MainFooter />}
     </div>
   );
 };
