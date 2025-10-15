@@ -1,3 +1,4 @@
+// stores/recipeStore.ts - ИСПРАВЛЕННАЯ ВЕРСИЯ
 import { create } from 'zustand';
 import { recipeService } from '../services/api';
 import type { Recipe, RecipeFilters, Tag } from '../types';
@@ -21,6 +22,8 @@ interface RecipeState {
   clearFilters: () => void;
   loadTags: () => Promise<void>;
   getPopularTags: () => Tag[];
+  // ИСПРАВИЛИ ТИП - теперь возвращает Recipe или бросает ошибку
+  getRecipeById: (id: string) => Promise<Recipe>;
 }
 
 export const useRecipeStore = create<RecipeState>((set, get) => ({
@@ -103,7 +106,6 @@ export const useRecipeStore = create<RecipeState>((set, get) => ({
     });
   },
 
-  // ИСПРАВЛЕНО: загрузка тегов с обработкой пагинированного ответа
   loadTags: async () => {
     const { isTagsLoading } = get();
     if (isTagsLoading) return;
@@ -111,7 +113,6 @@ export const useRecipeStore = create<RecipeState>((set, get) => ({
     set({ isTagsLoading: true, error: null });
     try {
       const response = await recipeService.getTags();
-      // response.data теперь содержит results из пагинированного ответа
       const tagsData = response.data;
 
       set({
@@ -130,5 +131,21 @@ export const useRecipeStore = create<RecipeState>((set, get) => ({
   getPopularTags: () => {
     const { tags } = get();
     return Array.isArray(tags) ? tags.slice(0, 15) : [];
+  },
+
+  // ИСПРАВИЛИ: Убрали проверку isDetailLoading и всегда возвращаем Recipe или бросаем ошибку
+  getRecipeById: async (id: string): Promise<Recipe> => {
+    set({ isDetailLoading: true, error: null, selectedRecipe: null });
+    try {
+      const response = await recipeService.getById(id);
+      const recipe = response.data;
+      set({ selectedRecipe: recipe, isDetailLoading: false });
+      return recipe;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || 'Ошибка загрузки рецепта';
+      set({ error: errorMessage, isDetailLoading: false });
+      // Бросаем ошибку вместо возврата undefined
+      throw new Error(errorMessage);
+    }
   },
 }));

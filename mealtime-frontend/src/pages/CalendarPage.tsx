@@ -1,11 +1,10 @@
-// CalendarPage.tsx - ОБНОВЛЕННАЯ ВЕРСИЯ
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { format, startOfWeek, addDays } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import VerticalWeekCalendar from '../components/VerticalWeekCalendar';
 import RecipeModal from '../components/RecipeModal';
+import RecipeViewModal from '../components/RecipeViewModal';
 import SuccessModal from '../components/SuccessModal';
 import WarningModal from '../components/WarningModal';
 import InstructionBlock from '../components/InstructionBlock';
@@ -18,12 +17,13 @@ import AdaptiveWeekCalendar from '../components/AdaptiveWeekCalendar';
 const CalendarPage: React.FC = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showRecipeModal, setShowRecipeModal] = useState(false);
+  const [showRecipeViewModal, setShowRecipeViewModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showWarningModal, setShowWarningModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedMealType, setSelectedMealType] = useState('');
+  const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
 
-  // Используем useRef для отслеживания предыдущих дат и предотвращения дублирования
   const previousWeekRange = useRef<{start: string, end: string} | null>(null);
   const isAuthenticated = useAuth();
   const navigate = useNavigate();
@@ -40,13 +40,13 @@ const CalendarPage: React.FC = () => {
     removeRecipeFromMealPlan
   } = useMealPlanStore();
 
-  const { loadRecipes } = useRecipeStore();
+  // ИСПОЛЬЗУЕМ СУЩЕСТВУЮЩИЙ STORE С НОВЫМ МЕТОДОМ
+  const { getRecipeById, isDetailLoading } = useRecipeStore();
 
   const formatDateToLocal = useCallback((date: Date): string => {
     return format(date, 'yyyy-MM-dd');
   }, []);
 
-  // Функция для получения диапазона дат текущей недели
   const getWeekRange = useCallback(() => {
     const startDate = startOfWeek(currentDate, { weekStartsOn: 1 });
     const endDate = addDays(startDate, 6);
@@ -56,11 +56,9 @@ const CalendarPage: React.FC = () => {
     };
   }, [currentDate, formatDateToLocal]);
 
-  // Функция для загрузки данных недели
   const loadWeekData = useCallback(async () => {
     const weekRange = getWeekRange();
 
-    // Проверяем, не загружаем ли мы те же данные
     if (previousWeekRange.current &&
         previousWeekRange.current.start === weekRange.start &&
         previousWeekRange.current.end === weekRange.end) {
@@ -71,20 +69,11 @@ const CalendarPage: React.FC = () => {
     previousWeekRange.current = weekRange;
   }, [getWeekRange, loadMealPlans]);
 
-  // Загрузка при монтировании и смене недели - ТОЛЬКО ДЛЯ АВТОРИЗОВАННЫХ
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    const loadData = async () => {
-      await loadWeekData();
-      // Рецепты загружаем только один раз
-      if (!previousWeekRange.current) {
-        await loadRecipes();
-      }
-    };
-
-    loadData();
-  }, [loadWeekData, loadRecipes, isAuthenticated]);
+    loadWeekData();
+  }, [loadWeekData, isAuthenticated]);
 
   const handleDateSelect = (date: string) => {
     if (!isAuthenticated) {
@@ -104,22 +93,32 @@ const CalendarPage: React.FC = () => {
     setShowRecipeModal(true);
   };
 
+  // ИСПОЛЬЗУЕМ НОВЫЙ МЕТОД ИЗ STORE
+  const handleRecipeClick = async (recipeId: string) => {
+    if (!isAuthenticated) return;
+
+    try {
+      const recipe = await getRecipeById(recipeId);
+      setSelectedRecipe(recipe);
+      setShowRecipeViewModal(true);
+    } catch (error) {
+      console.error('Ошибка загрузки рецепта:', error);
+    }
+  };
+
   const handleRecipeSelect = async (recipe: Recipe, portions: number) => {
     try {
       await addRecipeToMealPlan(selectedDate, selectedMealType, recipe, portions);
       setShowRecipeModal(false);
-      // После успешного добавления перезагружаем данные недели
       await loadWeekData();
     } catch (error) {
       console.error('Error adding recipe to meal plan:', error);
     }
   };
 
-  // Функция для удаления рецепта
   const handleRemoveRecipe = async (mealPlanId: string, recipeMealPlanId: string) => {
     try {
       await removeRecipeFromMealPlan(mealPlanId, recipeMealPlanId);
-      // После успешного удаления перезагружаем данные недели
       await loadWeekData();
     } catch (error) {
       console.error('Error removing recipe from meal plan:', error);
@@ -132,7 +131,6 @@ const CalendarPage: React.FC = () => {
       return;
     }
 
-    // Проверяем выбраны ли дни, если нет - показываем предупреждение
     if (selectedDays.length === 0) {
       setShowWarningModal(true);
       return;
@@ -446,13 +444,14 @@ const CalendarPage: React.FC = () => {
         </div>
       )}
 
-      {/* Используем адаптивный календарь */}
+      {/* Используем адаптивный календарь с новым пропсом */}
       <AdaptiveWeekCalendar
         currentDate={currentDate}
         mealPlans={mealPlans}
         onDateSelect={handleDateSelect}
         onAddMeal={handleAddMeal}
         onRemoveRecipe={handleRemoveRecipe}
+        onRecipeClick={handleRecipeClick} // ДОБАВИЛИ ЭТОТ ПРОПС
         selectedDays={selectedDays}
       />
 
@@ -484,6 +483,16 @@ const CalendarPage: React.FC = () => {
           onRecipeSelect={handleRecipeSelect}
           mealType={selectedMealType}
           selectedDate={selectedDate}
+        />
+      )}
+
+      {/* ДОБАВИЛИ: Модальное окно просмотра рецепта */}
+      {showRecipeViewModal && (
+        <RecipeViewModal
+          isOpen={showRecipeViewModal}
+          onClose={() => setShowRecipeViewModal(false)}
+          recipe={selectedRecipe}
+          isLoading={isDetailLoading}
         />
       )}
 
