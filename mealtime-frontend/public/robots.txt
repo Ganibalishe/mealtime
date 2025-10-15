@@ -1,13 +1,82 @@
+# Mealtime Planner - Robots.txt
+# https://mealtime-planner.ru
+
 User-agent: *
 Allow: /
 
+# Основной sitemap
 Sitemap: https://mealtime-planner.ru/sitemap.xml
 
-# SEO рекомендации
-Disallow: /api/
-Disallow: /login
-Disallow: /admin/
+# === ЗАПРЕЩЕННЫЕ РАЗДЕЛЫ ===
 
-# Разрешаем индексировать основные страницы
+# Админка и API
+Disallow: /admin/
+Disallow: /api/
+Disallow: /backend/
+
+# Страницы аутентификации (чтобы не индексировались формы входа)
+Disallow: /login/
+Disallow: /register/
+Disallow: /logout/
+
+# Служебные пути Django
+Disallow: /static/admin/
+Disallow: /media/admin/
+Disallow: /debug/
+
+# Технические и служебные разделы
+Disallow: /cdn-cgi/
+Disallow: /.well-known/
+Disallow: /.git/
+Disallow: /wp-admin/
+Disallow: /wp-includes/
+
+# Параметры фильтрации и сортировки (чтобы избежать дублей)
+Disallow: /*?sort=
+Disallow: /*?filter=
+Disallow: /*?search=
+Disallow: /*?page=
+Disallow: /*?utm_
+Disallow: /*?ref=
+
+# === РАЗРЕШЕННЫЕ РАЗДЕЛЫ (явное указание важных путей) ===
+
+# Главные разделы сайта
 Allow: /recipes/
+Allow: /recipe/
 Allow: /shopping-list/
+Allow: /calendar/
+
+# Статические ресурсы
+Allow: /static/images/
+Allow: /static/css/
+Allow: /static/js/
+Allow: /media/recipes/
+
+# === ДЛЯ ОПРЕДЕЛЕННЫХ ПОИСКОВЫХ СИСТЕМ ===
+
+# Яндекс
+User-agent: Yandex
+Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /login/
+Disallow: /register/
+Clean-param: utm_source&utm_medium&utm_campaign /recipes/
+Clean-param: ref /recipes/
+
+# Google
+User-agent: Googlebot
+Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /login/
+Disallow: /register/
+
+# Все остальные боты
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /login/
+Disallow: /register/
