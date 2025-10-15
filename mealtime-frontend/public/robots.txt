@@ -4,6 +4,34 @@
 # Основной sitemap
 Sitemap: https://mealtime-planner.ru/sitemap.xml
 
+# === ДЛЯ ОПРЕДЕЛЕННЫХ ПОИСКОВЫХ СИСТЕМ ===
+
+# Яндекс
+User-agent: Yandex
+Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /login/
+Disallow: /register/
+Clean-param: utm_source&utm_medium&utm_campaign /recipes/
+Clean-param: ref /recipes/
+
+# Google
+User-agent: Googlebot
+Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /login/
+Disallow: /register/
+
+# Все остальные боты
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /login/
+Disallow: /register/
+
 # === ЗАПРЕЩЕННЫЕ РАЗДЕЛЫ ===
 
 # Админка и API
@@ -50,30 +78,3 @@ Allow: /static/css/
 Allow: /static/js/
 Allow: /media/recipes/
 
-# === ДЛЯ ОПРЕДЕЛЕННЫХ ПОИСКОВЫХ СИСТЕМ ===
-
-# Яндекс
-User-agent: Yandex
-Allow: /
-Disallow: /admin/
-Disallow: /api/
-Disallow: /login/
-Disallow: /register/
-Clean-param: utm_source&utm_medium&utm_campaign /recipes/
-Clean-param: ref /recipes/
-
-# Google
-User-agent: Googlebot
-Allow: /
-Disallow: /admin/
-Disallow: /api/
-Disallow: /login/
-Disallow: /register/
-
-# Все остальные боты
-User-agent: *
-Allow: /
-Disallow: /admin/
-Disallow: /api/
-Disallow: /login/
-Disallow: /register/
