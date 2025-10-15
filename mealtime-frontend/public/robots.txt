@@ -1,9 +1,6 @@
 # Mealtime Planner - Robots.txt
 # https://mealtime-planner.ru
 
-User-agent: *
-Allow: /
-
 # Основной sitemap
 Sitemap: https://mealtime-planner.ru/sitemap.xml
 
