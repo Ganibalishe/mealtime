@@ -1,4 +1,4 @@
-// components/AdaptiveWeekCalendar.tsx - ОБНОВЛЕННАЯ ВЕРСИЯ
+// components/AdaptiveWeekCalendar.tsx - ОБНОВЛЕННАЯ ВЕРСИЯ С ЧЕКБОКСАМИ
 import React, { useState } from 'react';
 import { format, startOfWeek, addDays, isToday } from 'date-fns';
 import { ru } from 'date-fns/locale';
@@ -11,7 +11,7 @@ interface AdaptiveWeekCalendarProps {
   onDateSelect: (date: string) => void;
   onAddMeal: (date: string, mealType: string) => void;
   onRemoveRecipe: (mealPlanId: string, recipeMealPlanId: string) => void;
-  onRecipeClick: (recipeId: string) => void; // ДОБАВИЛИ ЭТОТ ПРОПС
+  onRecipeClick: (recipeId: string) => void;
   selectedDays: string[];
 }
 
@@ -21,7 +21,7 @@ const AdaptiveWeekCalendar: React.FC<AdaptiveWeekCalendarProps> = ({
   onDateSelect,
   onAddMeal,
   onRemoveRecipe,
-  onRecipeClick, // ДОБАВИЛИ
+  onRecipeClick,
   selectedDays
 }) => {
   const [expandedDays, setExpandedDays] = useState<string[]>([]);
@@ -141,7 +141,7 @@ const AdaptiveWeekCalendar: React.FC<AdaptiveWeekCalendarProps> = ({
     });
   };
 
-  // Десктоп версия (таблица) - с изменениями для клика по рецепту
+  // Десктоп версия (таблица) - с добавленными чекбоксами
   const DesktopView = () => (
     <div className="hidden lg:block bg-white rounded-lg shadow-sm overflow-hidden">
       <div className="bg-primary-500 px-6 py-4 border-b border-primary-600">
@@ -156,10 +156,11 @@ const AdaptiveWeekCalendar: React.FC<AdaptiveWeekCalendarProps> = ({
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider w-48">
                 <div className="flex items-center">
-                  День недели
-                  <span className="ml-2 text-xs text-primary-500 bg-primary-50 px-2 py-1 rounded-full">
-                    🔘 Нажмите для выбора
+                <span className="ml-2 text-xs text-primary-500 bg-primary-50 px-2 py-1 rounded-full">
+                    ✅ для списка покупок
                   </span>
+                  День недели
+
                 </div>
               </th>
               {mealTypes.map(mealType => (
@@ -185,17 +186,23 @@ const AdaptiveWeekCalendar: React.FC<AdaptiveWeekCalendarProps> = ({
               return (
                 <tr
                   key={dateStr}
-                  className={`hover:bg-neutral-50 cursor-pointer transition-all duration-200 ${
+                  className={`hover:bg-neutral-50 transition-all duration-200 ${
                     isSelected
                       ? 'bg-accent-50 border-l-4 border-accent-500 shadow-sm'
                       : isCurrentDay
                       ? 'bg-primary-50 border-l-4 border-primary-500'
                       : ''
                   }`}
-                  onClick={() => onDateSelect(dateStr)}
                 >
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
+                      {/* ЧЕКБОКС ДОБАВЛЕН ЗДЕСЬ */}
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => onDateSelect(dateStr)}
+                        className="h-4 w-4 text-accent-600 focus:ring-accent-500 border-neutral-300 rounded mr-3 cursor-pointer"
+                      />
                       <div className={`flex-shrink-0 h-10 w-10 rounded-full flex items-center justify-center ${
                         isCurrentDay ? 'bg-primary-100 text-primary-800' : 'bg-neutral-100 text-neutral-800'
                       }`}>
@@ -215,7 +222,7 @@ const AdaptiveWeekCalendar: React.FC<AdaptiveWeekCalendarProps> = ({
                     <div className="mt-1">
                       {isSelected && (
                         <span className="inline-block bg-accent-500 text-white text-xs px-2 py-1 rounded-full">
-                          Выбран
+                          Выбран для списка
                         </span>
                       )}
                       {!isSelected && isCurrentDay && (
@@ -247,7 +254,7 @@ const AdaptiveWeekCalendar: React.FC<AdaptiveWeekCalendarProps> = ({
                                   className="bg-primary-50 rounded-lg p-3 text-primary-800 border border-primary-200 cursor-pointer hover:bg-primary-100 transition-colors"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    onRecipeClick(recipe.recipe); // ДОБАВИЛИ ОБРАБОТЧИК КЛИКА
+                                    onRecipeClick(recipe.recipe);
                                   }}
                                 >
                                   <div className="flex justify-between items-start mb-1">
@@ -299,10 +306,18 @@ const AdaptiveWeekCalendar: React.FC<AdaptiveWeekCalendarProps> = ({
           </tbody>
         </table>
       </div>
+
+      {/* Подсказка для пользователя в десктопной версии */}
+      <div className="bg-primary-50 border-t border-primary-200 px-6 py-3">
+        <div className="flex items-center text-sm text-primary-700">
+          <span className="mr-2">💡</span>
+          Отмечайте дни с помощью ✅, затем нажмите «Сформировать список покупок»
+        </div>
+      </div>
     </div>
   );
 
-  // Мобильная версия (аккордеон) - с изменениями для клика по рецепту
+  // Мобильная версия (аккордеон) - оставляем без изменений
   const MobileView = () => (
     <div className="lg:hidden space-y-3">
       <div className="bg-white rounded-lg shadow-sm p-4">
@@ -311,7 +326,7 @@ const AdaptiveWeekCalendar: React.FC<AdaptiveWeekCalendarProps> = ({
         </h3>
         <div className="text-sm text-neutral-600 bg-primary-50 p-3 rounded-lg">
           <span className="font-medium">📌 Как выбрать дни:</span>
-          <p className="mt-1">Используйте чекбоксы для выбора дней, затем нажмите "Сформировать список покупок"</p>
+          <p className="mt-1">Используйте ✅ для выбора дней, затем нажмите "Сформировать список покупок"</p>
         </div>
       </div>
 
@@ -453,7 +468,7 @@ const AdaptiveWeekCalendar: React.FC<AdaptiveWeekCalendarProps> = ({
                               className="bg-primary-50 rounded-lg p-3 text-primary-800 border border-primary-200 cursor-pointer hover:bg-primary-100 transition-colors"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                onRecipeClick(recipe.recipe); // ДОБАВИЛИ ОБРАБОТЧИК КЛИКА
+                                onRecipeClick(recipe.recipe);
                               }}
                             >
                               <div className="flex justify-between items-start mb-2">

@@ -8,6 +8,7 @@ import { recipeService } from '../services/api';
 import type { Recipe } from '../types';
 import { mealPlanService } from '../services/api';
 import SeoHead from '../components/SeoHead';
+import AddToCalendarSuccessModal from '../components/AddToCalendarSuccessModal';
 
 const RecipeDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -22,6 +23,8 @@ const RecipeDetailPage: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedMealType, setSelectedMealType] = useState('lunch');
   const [portions, setPortions] = useState(2);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+
 
   // Состояние для модалки авторизации
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -51,7 +54,7 @@ const RecipeDetailPage: React.FC = () => {
 
     try {
       await mealPlanService.addRecipeToDate(selectedDate, selectedMealType, recipe.id, portions);
-      alert(`Рецепт "${recipe.name}" добавлен в календарь на ${format(new Date(selectedDate), 'd MMMM yyyy', { locale: ru })}`);
+      setShowSuccessModal(true);
       setShowAddToCalendar(false);
     } catch (error) {
       console.error('Error adding recipe to calendar:', error);
@@ -66,6 +69,14 @@ const RecipeDetailPage: React.FC = () => {
     } else {
       setShowAddToCalendar(true);
     }
+  };
+  const handleContinue = () => {
+    setShowSuccessModal(false);
+  };
+
+  const handleGoToCalendar = () => {
+    setShowSuccessModal(false);
+    navigate('/'); // Переход на главную страницу (календарь)
   };
 
   // Структурированные данные для рецепта (JSON-LD)
@@ -559,6 +570,16 @@ const RecipeDetailPage: React.FC = () => {
           </div>
         </div>
       )}
+      <AddToCalendarSuccessModal
+        isOpen={showSuccessModal}
+        onClose={handleContinue}
+        onContinue={handleContinue}
+        onGoToCalendar={handleGoToCalendar}
+        recipeName={recipe?.name || ''}
+        selectedDate={selectedDate}
+        selectedMealType={selectedMealType}
+        portions={portions}
+      />
     </div>
   );
 };
