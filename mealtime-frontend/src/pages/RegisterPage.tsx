@@ -57,7 +57,6 @@ const RegisterPage: React.FC = () => {
       navigate('/');
 
     } catch (err: any) {
-      console.error('Registration error:', err);
 
       // Улучшенная обработка ошибок
       if (err.response?.data?.error) {

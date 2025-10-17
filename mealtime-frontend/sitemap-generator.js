@@ -11,7 +11,6 @@ const BASE_URL = 'https://mealtime-planner.ru';
 
 // Функция для генерации sitemap
 function generateSitemap() {
-  console.log('Starting sitemap generation...');
 
   let sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -55,8 +54,6 @@ function generateSitemap() {
   // Сохраняем файл
   const sitemapPath = path.join(__dirname, 'public', 'sitemap.xml');
   fs.writeFileSync(sitemapPath, sitemap);
-  console.log(`Sitemap generated successfully! Total URLs: ${staticPages.length}`);
-  console.log(`Sitemap saved to: ${sitemapPath}`);
 }
 
 // Запускаем генерацию

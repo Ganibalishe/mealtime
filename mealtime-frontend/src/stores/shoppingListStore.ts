@@ -80,7 +80,6 @@ export const useShoppingListStore = create<ShoppingListState>((set, get) => ({
 
     } catch (error: any) {
       set({ error: error.message });
-      console.error('Error toggling shopping list item:', error);
     }
   },
 

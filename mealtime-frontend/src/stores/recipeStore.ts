@@ -1,4 +1,4 @@
-// stores/recipeStore.ts - ИСПРАВЛЕННАЯ ВЕРСИЯ
+// stores/recipeStore.ts - УБЕДИТЕСЬ ЧТО ВСЕ МЕТОДЫ СОХРАНЯЮТ nextPage
 import { create } from 'zustand';
 import { recipeService } from '../services/api';
 import type { Recipe, RecipeFilters, Tag } from '../types';
@@ -15,6 +15,8 @@ interface RecipeState {
   isSearchLoading: boolean;
   isDetailLoading: boolean;
   isTagsLoading: boolean;
+  nextPage: string | null;
+  isLoadingMore: boolean;
 
   loadRecipes: () => Promise<void>;
   searchRecipes: (query: string) => Promise<void>;
@@ -22,8 +24,8 @@ interface RecipeState {
   clearFilters: () => void;
   loadTags: () => Promise<void>;
   getPopularTags: () => Tag[];
-  // ИСПРАВИЛИ ТИП - теперь возвращает Recipe или бросает ошибку
   getRecipeById: (id: string) => Promise<Recipe>;
+  loadNextPage: () => Promise<void>;
 }
 
 export const useRecipeStore = create<RecipeState>((set, get) => ({
@@ -38,6 +40,8 @@ export const useRecipeStore = create<RecipeState>((set, get) => ({
   isSearchLoading: false,
   isDetailLoading: false,
   isTagsLoading: false,
+  nextPage: null,
+  isLoadingMore: false,
 
   loadRecipes: async () => {
     const { isListLoading } = get();
@@ -49,6 +53,7 @@ export const useRecipeStore = create<RecipeState>((set, get) => ({
       set({
         recipes: response.data.results,
         filteredRecipes: response.data.results,
+        nextPage: response.data.next,
         isListLoading: false
       });
     } catch (error: any) {
@@ -68,6 +73,7 @@ export const useRecipeStore = create<RecipeState>((set, get) => ({
       const response = await recipeService.search({ q: query });
       set({
         filteredRecipes: response.data.results,
+        nextPage: response.data.next,
         isSearchLoading: false
       });
     } catch (error: any) {
@@ -88,6 +94,7 @@ export const useRecipeStore = create<RecipeState>((set, get) => ({
       set({
         filteredRecipes: response.data.results,
         filters,
+        nextPage: response.data.next, // ВАЖНО: сохраняем nextPage
         isSearchLoading: false
       });
     } catch (error: any) {
@@ -102,7 +109,7 @@ export const useRecipeStore = create<RecipeState>((set, get) => ({
     const { recipes } = get();
     set({
       filteredRecipes: recipes,
-      filters: {}
+      filters: {},
     });
   },
 
@@ -114,7 +121,6 @@ export const useRecipeStore = create<RecipeState>((set, get) => ({
     try {
       const response = await recipeService.getTags();
       const tagsData = response.data;
-
       set({
         tags: tagsData,
         isTagsLoading: false
@@ -133,7 +139,6 @@ export const useRecipeStore = create<RecipeState>((set, get) => ({
     return Array.isArray(tags) ? tags.slice(0, 15) : [];
   },
 
-  // ИСПРАВИЛИ: Убрали проверку isDetailLoading и всегда возвращаем Recipe или бросаем ошибку
   getRecipeById: async (id: string): Promise<Recipe> => {
     set({ isDetailLoading: true, error: null, selectedRecipe: null });
     try {
@@ -144,8 +149,27 @@ export const useRecipeStore = create<RecipeState>((set, get) => ({
     } catch (error: any) {
       const errorMessage = error.response?.data?.message || 'Ошибка загрузки рецепта';
       set({ error: errorMessage, isDetailLoading: false });
-      // Бросаем ошибку вместо возврата undefined
       throw new Error(errorMessage);
+    }
+  },
+
+  loadNextPage: async () => {
+    const { nextPage, isLoadingMore } = get();
+    if (!nextPage || isLoadingMore) return;
+
+    set({ isLoadingMore: true, error: null });
+    try {
+      const response = await recipeService.getByUrl(nextPage);
+      set(state => ({
+        filteredRecipes: [...state.filteredRecipes, ...response.data.results],
+        nextPage: response.data.next,
+        isLoadingMore: false
+      }));
+    } catch (error: any) {
+      set({
+        error: 'Ошибка загрузки дополнительных рецептов',
+        isLoadingMore: false
+      });
     }
   },
 }));

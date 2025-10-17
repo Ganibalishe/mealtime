@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useRecipeStore } from '../stores/recipeStore';
 import type { RecipeFilters } from '../types';
@@ -17,12 +17,16 @@ const RecipesPage: React.FC = () => {
     loadRecipes,
     loadTags,
     getPopularTags,
-    tags
+    tags,
+    nextPage,
+    loadNextPage,
+    isLoadingMore
   } = useRecipeStore();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [maxCookingTime, setMaxCookingTime] = useState<number | ''>('');
+  const [hasInitialized, setHasInitialized] = useState(false);
 
   // Восстановление фильтров из localStorage и загрузка данных
   useEffect(() => {
@@ -36,7 +40,9 @@ const RecipesPage: React.FC = () => {
 
     // Загружаем рецепты и теги при инициализации
     loadRecipes();
-    loadTags();
+    loadTags().then(() => {
+      setHasInitialized(true);
+    });
   }, [loadRecipes, loadTags]);
 
   // Сохранение фильтров в localStorage
@@ -45,8 +51,10 @@ const RecipesPage: React.FC = () => {
     localStorage.setItem('recipeFilters', JSON.stringify(filters));
   }, [searchQuery, selectedTags, maxCookingTime]);
 
-  // Применение фильтров с debounce
+  // Применение фильтров с debounce - ТОЛЬКО ПОСЛЕ ИНИЦИАЛИЗАЦИИ
   useEffect(() => {
+    if (!hasInitialized) return;
+
     const timeoutId = setTimeout(() => {
       const filters: RecipeFilters = {};
 
@@ -64,14 +72,18 @@ const RecipesPage: React.FC = () => {
 
       if (Object.keys(filters).length > 0) {
         applyFilters(filters);
-      } else {
-        // Если фильтров нет, показываем все рецепты
-        clearFilters();
       }
+      // Если фильтров нет, НЕ вызываем clearFilters чтобы не сбросить nextPage
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [searchQuery, selectedTags, maxCookingTime, applyFilters, clearFilters]);
+  }, [searchQuery, selectedTags, maxCookingTime, hasInitialized, applyFilters]);
+
+  // Загрузка дополнительных рецептов
+  const handleLoadMore = async () => {
+    if (!nextPage || isLoadingMore) return;
+    await loadNextPage();
+  };
 
   const handleRecipeClick = (recipeId: string) => {
     navigate(`/recipes/${recipeId}`);
@@ -89,7 +101,8 @@ const RecipesPage: React.FC = () => {
     setSearchQuery('');
     setSelectedTags([]);
     setMaxCookingTime('');
-    clearFilters();
+    // При явном сбросе фильтров перезагружаем рецепты
+    loadRecipes();
   };
 
   // Используем recipes если filteredRecipes пуст (нет активных фильтров)
@@ -244,83 +257,112 @@ const RecipesPage: React.FC = () => {
       {!isLoading && (
         <>
           {displayRecipes.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {displayRecipes.map(recipe => (
-                <div
-                  key={recipe.id}
-                  onClick={() => handleRecipeClick(recipe.id)}
-                  className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-all duration-200 cursor-pointer group"
-                >
-                  {/* Карточка рецепта */}
-                  <div className="p-4">
-                    {/* Заголовок и описание */}
-                    <div className="mb-3">
-                      <h3 className="font-semibold text-lg text-gray-900 mb-2 line-clamp-2 group-hover:text-primary-600 transition-colors">
-                        {recipe.name}
-                      </h3>
-                      {recipe.description && (
-                        <p className="text-gray-600 text-sm line-clamp-2">
-                          {recipe.description}
-                        </p>
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {displayRecipes.map(recipe => (
+                  <div
+                    key={recipe.id}
+                    onClick={() => handleRecipeClick(recipe.id)}
+                    className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-all duration-200 cursor-pointer group"
+                  >
+                    {/* Карточка рецепта */}
+                    <div className="p-4">
+                      {/* Заголовок и описание */}
+                      <div className="mb-3">
+                        <h3 className="font-semibold text-lg text-gray-900 mb-2 line-clamp-2 group-hover:text-primary-600 transition-colors">
+                          {recipe.name}
+                        </h3>
+                        {recipe.description && (
+                          <p className="text-gray-600 text-sm line-clamp-2">
+                            {recipe.description}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Теги */}
+                      {recipe.tags && recipe.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mb-3">
+                          {recipe.tags.slice(0, 2).map(tag => (
+                            <span
+                              key={tag.id}
+                              className="px-2 py-1 rounded-full text-xs text-white"
+                              style={{ backgroundColor: tag.color || '#6B7280' }}
+                            >
+                              {tag.name}
+                            </span>
+                          ))}
+                          {recipe.tags.length > 2 && (
+                            <span className="px-2 py-1 rounded-full text-xs bg-gray-200 text-gray-600">
+                              +{recipe.tags.length - 2}
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Мета-информация */}
+                      <div className="flex justify-between items-center text-sm text-gray-500">
+                        <div className="flex items-center space-x-4">
+                          <span className="flex items-center">
+                            ⏱️ {recipe.cooking_time} мин
+                          </span>
+                          <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs">
+                            {recipe.difficulty_display}
+                          </span>
+                        </div>
+                        <span className="bg-primary-100 text-primary-700 px-2 py-1 rounded text-xs">
+                          {recipe.portions} порц.
+                        </span>
+                      </div>
+
+                      {/* Ингредиенты (превью) */}
+                      {recipe.ingredients && recipe.ingredients.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-gray-100">
+                          <p className="text-xs text-gray-500 line-clamp-1">
+                            {recipe.ingredients.slice(0, 3).map(ing => ing.ingredient_name).join(', ')}
+                            {recipe.ingredients.length > 3 && '...'}
+                          </p>
+                        </div>
                       )}
                     </div>
 
-                    {/* Теги */}
-                    {recipe.tags && recipe.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mb-3">
-                        {recipe.tags.slice(0, 2).map(tag => (
-                          <span
-                            key={tag.id}
-                            className="px-2 py-1 rounded-full text-xs text-white"
-                            style={{ backgroundColor: tag.color || '#6B7280' }}
-                          >
-                            {tag.name}
-                          </span>
-                        ))}
-                        {recipe.tags.length > 2 && (
-                          <span className="px-2 py-1 rounded-full text-xs bg-gray-200 text-gray-600">
-                            +{recipe.tags.length - 2}
-                          </span>
-                        )}
+                    {/* Ховер-эффект */}
+                    <div className="bg-primary-50 bg-opacity-0 group-hover:bg-opacity-100 transition-all duration-200 px-4 py-3 border-t border-gray-100">
+                      <div className="text-primary-600 text-sm font-medium flex items-center justify-between">
+                        <span>Открыть рецепт</span>
+                        <span>→</span>
                       </div>
-                    )}
-
-                    {/* Мета-информация */}
-                    <div className="flex justify-between items-center text-sm text-gray-500">
-                      <div className="flex items-center space-x-4">
-                        <span className="flex items-center">
-                          ⏱️ {recipe.cooking_time} мин
-                        </span>
-                        <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs">
-                          {recipe.difficulty_display}
-                        </span>
-                      </div>
-                      <span className="bg-primary-100 text-primary-700 px-2 py-1 rounded text-xs">
-                        {recipe.portions} порц.
-                      </span>
                     </div>
-
-                    {/* Ингредиенты (превью) */}
-                    {recipe.ingredients && recipe.ingredients.length > 0 && (
-                      <div className="mt-3 pt-3 border-t border-gray-100">
-                        <p className="text-xs text-gray-500 line-clamp-1">
-                          {recipe.ingredients.slice(0, 3).map(ing => ing.ingredient_name).join(', ')}
-                          {recipe.ingredients.length > 3 && '...'}
-                        </p>
-                      </div>
-                    )}
                   </div>
+                ))}
+              </div>
 
-                  {/* Ховер-эффект */}
-                  <div className="bg-primary-50 bg-opacity-0 group-hover:bg-opacity-100 transition-all duration-200 px-4 py-3 border-t border-gray-100">
-                    <div className="text-primary-600 text-sm font-medium flex items-center justify-between">
-                      <span>Открыть рецепт</span>
-                      <span>→</span>
-                    </div>
+              {/* Кнопка загрузки дополнительных рецептов */}
+              {nextPage && (
+                <div className="mt-12 text-center">
+                  <div className="border-t border-gray-200 pt-8">
+                    <button
+                      onClick={handleLoadMore}
+                      disabled={isLoadingMore}
+                      className="bg-primary-50 hover:bg-primary-100 text-primary-700 font-medium py-3 px-8 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mx-auto"
+                    >
+                      {isLoadingMore ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-700"></div>
+                          <span>Загрузка...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>📥 Загрузить еще рецепты</span>
+                        </>
+                      )}
+                    </button>
+                    <p className="text-center text-sm text-gray-500 mt-3">
+                      Показано {displayRecipes.length} рецептов
+                    </p>
                   </div>
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           ) : (
             /* Сообщение, если рецептов нет */
             <div className="text-center py-12">

@@ -40,7 +40,6 @@ const RecipeDetailPage: React.FC = () => {
         setPortions(response.data.portions); // Устанавливаем порции по умолчанию из рецепта
       } catch (error) {
         setError('Рецепт не найден');
-        console.error('Error loading recipe:', error);
       } finally {
         setIsLoading(false);
       }
@@ -57,7 +56,6 @@ const RecipeDetailPage: React.FC = () => {
       setShowSuccessModal(true);
       setShowAddToCalendar(false);
     } catch (error) {
-      console.error('Error adding recipe to calendar:', error);
       alert('Ошибка при добавлении рецепта в календарь');
     }
   };

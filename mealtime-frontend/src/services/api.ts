@@ -87,7 +87,14 @@ api.interceptors.response.use(
 export const recipeService = {
   getAll: () => api.get<PaginatedResponse<Recipe>>('/recipes/'),
   getById: (id: string) => api.get<Recipe>(`/recipes/${id}/`),
-
+  getByUrl: (url: string) => {
+    // Для полных URL (которые приходят из nextPage)
+    if (url.startsWith('http')) {
+      return axios.get<PaginatedResponse<Recipe>>(url);
+    }
+    // Для относительных URL
+    return api.get<PaginatedResponse<Recipe>>(url);
+  },
   // ИСПРАВЛЕННЫЙ МЕТОД: правильная отправка массива тегов
   search: (params: {
     q?: string;
@@ -193,7 +200,6 @@ export const ingredientService = {
 
 export const authService = {
   login: async (username: string, password: string) => {
-    console.log('📤 Отправка запроса на аутентификацию...');
     const response = await api.post('/auth/token/', {
       username,
       password,

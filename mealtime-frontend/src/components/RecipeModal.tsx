@@ -1,3 +1,4 @@
+// components/RecipeModal.tsx - ОБНОВЛЕННАЯ ВЕРСИЯ С ПАГИНАЦИЕЙ
 import React, { useState, useEffect, useRef } from 'react';
 import { format, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
@@ -42,7 +43,10 @@ const RecipeModal: React.FC<RecipeModalProps> = ({
     loadTags,
     getPopularTags,
     applyFilters,
-    tags
+    tags,
+    nextPage,
+    loadNextPage,
+    isLoadingMore
   } = useRecipeStore();
 
   const formatDateString = (dateStr: string): string => {
@@ -83,7 +87,6 @@ const RecipeModal: React.FC<RecipeModalProps> = ({
   // Восстановление позиции скролла
   const restoreScrollPosition = () => {
     if (scrollableRef.current && scrollPosition > 0) {
-      // Небольшая задержка для гарантии, что DOM обновился
       setTimeout(() => {
         if (scrollableRef.current) {
           scrollableRef.current.scrollTo({
@@ -93,6 +96,12 @@ const RecipeModal: React.FC<RecipeModalProps> = ({
         }
       }, 50);
     }
+  };
+
+  // Загрузка дополнительных рецептов
+  const handleLoadMore = async () => {
+    if (!nextPage || isLoadingMore) return;
+    await loadNextPage();
   };
 
   // Загрузка данных при открытии модального окна
@@ -107,9 +116,8 @@ const RecipeModal: React.FC<RecipeModalProps> = ({
       setSelectedTags([]);
       setMaxCookingTime('');
       setShowScrollTop(false);
-      setScrollPosition(0); // Сброс позиции скролла при открытии
+      setScrollPosition(0);
 
-      // Сброс скролла при открытии
       setTimeout(() => {
         if (scrollableRef.current) {
           scrollableRef.current.scrollTop = 0;
@@ -148,12 +156,10 @@ const RecipeModal: React.FC<RecipeModalProps> = ({
   }, [searchQuery, selectedTags, maxCookingTime, isOpen, applyFilters, loadRecipes]);
 
   const handleRecipeClick = (recipe: Recipe) => {
-    // Сохраняем позицию скролла перед переходом
     saveScrollPosition();
     setSelectedRecipe(recipe);
     setPortions(recipe.portions);
 
-    // Прокрутка наверх при выборе рецепта
     setTimeout(() => {
       if (scrollableRef.current) {
         scrollableRef.current.scrollTop = 0;
@@ -164,7 +170,6 @@ const RecipeModal: React.FC<RecipeModalProps> = ({
   const handleBackToList = () => {
     setSelectedRecipe(null);
     setPortions(2);
-    // Восстанавливаем позицию скролла после небольшой задержки
     setTimeout(restoreScrollPosition, 100);
   };
 
@@ -210,7 +215,7 @@ const RecipeModal: React.FC<RecipeModalProps> = ({
     setSelectedTags([]);
     setMaxCookingTime('');
     setShowScrollTop(false);
-    setScrollPosition(0); // Сброс позиции при закрытии
+    setScrollPosition(0);
     onClose();
   };
 
@@ -388,7 +393,7 @@ const RecipeModal: React.FC<RecipeModalProps> = ({
                     {/* Кнопки действий */}
                     <div className="space-y-3 sm:space-y-0 sm:flex sm:space-x-3">
                       <button
-                        onClick={handleBackToList} // ИЗМЕНИЛИ ЗДЕСЬ
+                        onClick={handleBackToList}
                         className="btn-outline w-full sm:flex-1 py-3 text-sm sm:text-base mobile-touch-target"
                       >
                         Назад к выбору
@@ -506,94 +511,123 @@ const RecipeModal: React.FC<RecipeModalProps> = ({
                   ) : (
                     <>
                       {filteredRecipes.length > 0 ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 p-4 sm:p-6">
-                          {filteredRecipes.map(recipe => {
-                            const currentPortions = recipePortions[recipe.id] || recipe.portions;
+                        <>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 p-4 sm:p-6">
+                            {filteredRecipes.map(recipe => {
+                              const currentPortions = recipePortions[recipe.id] || recipe.portions;
 
-                            return (
-                              <div
-                                key={recipe.id}
-                                className="bg-white rounded-lg border border-neutral-200 p-4 hover:shadow-md transition-all duration-200 cursor-pointer hover:border-primary-300 mobile-touch-target min-h-[160px] flex flex-col justify-between"
-                                onClick={() => handleRecipeClick(recipe)}
-                              >
-                                <div className="flex-1">
-                                  <h4 className="font-semibold text-neutral-900 mb-2 text-sm sm:text-base line-clamp-2">
-                                    {recipe.name}
-                                  </h4>
-                                  <p className="text-neutral-600 text-xs sm:text-sm line-clamp-2 mb-2">
-                                    {recipe.description}
-                                  </p>
+                              return (
+                                <div
+                                  key={recipe.id}
+                                  className="bg-white rounded-lg border border-neutral-200 p-4 hover:shadow-md transition-all duration-200 cursor-pointer hover:border-primary-300 mobile-touch-target min-h-[160px] flex flex-col justify-between"
+                                  onClick={() => handleRecipeClick(recipe)}
+                                >
+                                  <div className="flex-1">
+                                    <h4 className="font-semibold text-neutral-900 mb-2 text-sm sm:text-base line-clamp-2">
+                                      {recipe.name}
+                                    </h4>
+                                    <p className="text-neutral-600 text-xs sm:text-sm line-clamp-2 mb-2">
+                                      {recipe.description}
+                                    </p>
 
-                                  {/* Теги рецепта в списке */}
-                                  {recipe.tags && recipe.tags.length > 0 && (
-                                    <div className="flex flex-wrap gap-1 mb-2">
-                                      {recipe.tags.slice(0, 2).map(tag => (
-                                        <span
-                                          key={tag.id}
-                                          className="px-2 py-0.5 rounded-full text-xs text-white"
-                                          style={{ backgroundColor: tag.color || '#6B7280' }}
-                                        >
-                                          {tag.name}
-                                        </span>
-                                      ))}
-                                      {recipe.tags.length > 2 && (
-                                        <span className="px-2 py-0.5 rounded-full text-xs bg-neutral-200 text-neutral-600">
-                                          +{recipe.tags.length - 2}
-                                        </span>
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
-
-                                <div className="space-y-2">
-                                  {/* Мета-информация */}
-                                  <div className="flex justify-between text-xs text-neutral-500">
-                                    <span>{recipe.cooking_time} мин</span>
-                                    <span>{recipe.difficulty_display}</span>
-                                    <span>{recipe.portions} порций</span>
+                                    {/* Теги рецепта в списке */}
+                                    {recipe.tags && recipe.tags.length > 0 && (
+                                      <div className="flex flex-wrap gap-1 mb-2">
+                                        {recipe.tags.slice(0, 2).map(tag => (
+                                          <span
+                                            key={tag.id}
+                                            className="px-2 py-0.5 rounded-full text-xs text-white"
+                                            style={{ backgroundColor: tag.color || '#6B7280' }}
+                                          >
+                                            {tag.name}
+                                          </span>
+                                        ))}
+                                        {recipe.tags.length > 2 && (
+                                          <span className="px-2 py-0.5 rounded-full text-xs bg-neutral-200 text-neutral-600">
+                                            +{recipe.tags.length - 2}
+                                          </span>
+                                        )}
+                                      </div>
+                                    )}
                                   </div>
 
-                                  {/* Быстрое добавление */}
-                                  <div
-                                    className="flex items-center justify-between gap-2"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    <div className="flex items-center space-x-1 flex-1">
-                                      <button
-                                        onClick={() => handlePortionChange(recipe.id, currentPortions - 1)}
-                                        className="w-6 h-6 rounded-full bg-neutral-200 flex items-center justify-center hover:bg-neutral-300 text-sm font-bold mobile-touch-target"
-                                        disabled={currentPortions <= 1}
-                                      >
-                                        -
-                                      </button>
-                                      <input
-                                        type="number"
-                                        min="1"
-                                        max="20"
-                                        value={currentPortions}
-                                        onChange={(e) => handlePortionChange(recipe.id, parseInt(e.target.value) || 1)}
-                                        className="w-12 text-center border border-neutral-300 rounded py-1 text-xs mobile-touch-target"
-                                      />
-                                      <button
-                                        onClick={() => handlePortionChange(recipe.id, currentPortions + 1)}
-                                        className="w-6 h-6 rounded-full bg-neutral-200 flex items-center justify-center hover:bg-neutral-300 text-sm font-bold mobile-touch-target"
-                                        disabled={currentPortions >= 20}
-                                      >
-                                        +
-                                      </button>
+                                  <div className="space-y-2">
+                                    {/* Мета-информация */}
+                                    <div className="flex justify-between text-xs text-neutral-500">
+                                      <span>{recipe.cooking_time} мин</span>
+                                      <span>{recipe.difficulty_display}</span>
+                                      <span>{recipe.portions} порций</span>
                                     </div>
-                                    <button
-                                      onClick={() => handleQuickAdd(recipe)}
-                                      className="bg-accent-500 hover:bg-accent-600 text-white text-xs py-2 px-3 rounded transition-colors duration-200 mobile-touch-target whitespace-nowrap"
+
+                                    {/* Быстрое добавление */}
+                                    <div
+                                      className="flex items-center justify-between gap-2"
+                                      onClick={(e) => e.stopPropagation()}
                                     >
-                                      Добавить
-                                    </button>
+                                      <div className="flex items-center space-x-1 flex-1">
+                                        <button
+                                          onClick={() => handlePortionChange(recipe.id, currentPortions - 1)}
+                                          className="w-6 h-6 rounded-full bg-neutral-200 flex items-center justify-center hover:bg-neutral-300 text-sm font-bold mobile-touch-target"
+                                          disabled={currentPortions <= 1}
+                                        >
+                                          -
+                                        </button>
+                                        <input
+                                          type="number"
+                                          min="1"
+                                          max="20"
+                                          value={currentPortions}
+                                          onChange={(e) => handlePortionChange(recipe.id, parseInt(e.target.value) || 1)}
+                                          className="w-12 text-center border border-neutral-300 rounded py-1 text-xs mobile-touch-target"
+                                        />
+                                        <button
+                                          onClick={() => handlePortionChange(recipe.id, currentPortions + 1)}
+                                          className="w-6 h-6 rounded-full bg-neutral-200 flex items-center justify-center hover:bg-neutral-300 text-sm font-bold mobile-touch-target"
+                                          disabled={currentPortions >= 20}
+                                        >
+                                          +
+                                        </button>
+                                      </div>
+                                      <button
+                                        onClick={() => handleQuickAdd(recipe)}
+                                        className="bg-accent-500 hover:bg-accent-600 text-white text-xs py-2 px-3 rounded transition-colors duration-200 mobile-touch-target whitespace-nowrap"
+                                      >
+                                        Добавить
+                                      </button>
+                                    </div>
                                   </div>
                                 </div>
+                              );
+                            })}
+                          </div>
+
+                          {/* Кнопка загрузки дополнительных рецептов */}
+                          {nextPage && (
+                            <div className="px-4 sm:px-6 pb-6">
+                              <div className="border-t border-neutral-200 pt-6">
+                                <button
+                                  onClick={handleLoadMore}
+                                  disabled={isLoadingMore}
+                                  className="w-full bg-primary-50 hover:bg-primary-100 text-primary-700 font-medium py-3 px-4 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                >
+                                  {isLoadingMore ? (
+                                    <>
+                                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-700"></div>
+                                      <span>Загрузка...</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span>📥 Загрузить еще рецепты</span>
+                                    </>
+                                  )}
+                                </button>
+                                <p className="text-center text-xs text-neutral-500 mt-2">
+                                  Показано {filteredRecipes.length} рецептов
+                                </p>
                               </div>
-                            );
-                          })}
-                        </div>
+                            </div>
+                          )}
+                        </>
                       ) : (
                         <div className="text-center py-12 text-neutral-500 px-4">
                           {hasActiveFilters
