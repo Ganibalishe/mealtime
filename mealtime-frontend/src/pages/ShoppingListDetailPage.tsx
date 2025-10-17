@@ -22,7 +22,7 @@ const ShoppingListDetailPage: React.FC = () => {
       loadShoppingListById(id);
     }
   }, [id, loadShoppingListById]);
-  
+
 
   const handleToggleItem = async (itemId: string) => {
     await toggleShoppingListItem(itemId);
@@ -95,9 +95,6 @@ const ShoppingListDetailPage: React.FC = () => {
               {Math.round(currentShoppingList.progress)}%
             </span>
           </div>
-          <div className="text-sm text-gray-500">
-            Статус: {getStatusDisplay(currentShoppingList.status)}
-          </div>
         </div>
         <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
           <div
@@ -144,16 +141,5 @@ const ShoppingListDetailPage: React.FC = () => {
     </div>
   );
 };
-
-// Вспомогательная функция для отображения статуса
-function getStatusDisplay(status: string) {
-  const statusMap: { [key: string]: string } = {
-    draft: 'Черновик',
-    active: 'Активный',
-    completed: 'Завершен',
-    archived: 'Архив',
-  };
-  return statusMap[status] || status;
-}
 
 export default ShoppingListDetailPage;

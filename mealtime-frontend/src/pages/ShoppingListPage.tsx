@@ -175,12 +175,6 @@ const ShoppingListPage: React.FC = () => {
                   style={{ width: `${list.progress}%` }}
                 ></div>
               </div>
-              <div className="mt-4 flex justify-between text-sm text-gray-500">
-                <span>Статус: {getStatusDisplay(list.status)}</span>
-                {list.is_outdated && (
-                  <span className="text-accent-500">Устарел</span>
-                )}
-              </div>
             </Link>
           ))}
         </div>
@@ -188,16 +182,5 @@ const ShoppingListPage: React.FC = () => {
     </div>
   );
 };
-
-// Вспомогательная функция для отображения статуса
-function getStatusDisplay(status: string) {
-  const statusMap: { [key: string]: string } = {
-    draft: 'Черновик',
-    active: 'Активный',
-    completed: 'Завершен',
-    archived: 'Архив',
-  };
-  return statusMap[status] || status;
-}
 
 export default ShoppingListPage;
