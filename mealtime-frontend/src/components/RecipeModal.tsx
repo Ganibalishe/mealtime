@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { format, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { useRecipeStore } from '../stores/recipeStore';
-import type { Recipe, Tag } from '../types';
+import type { Recipe } from '../types';
 import Portal from '../components/Portal';
 
 interface RecipeModalProps {
@@ -30,20 +30,17 @@ const RecipeModal: React.FC<RecipeModalProps> = ({
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [scrollPosition, setScrollPosition] = useState(0);
 
-  const modalContentRef = useRef<HTMLDivElement>(null);
   const scrollableRef = useRef<HTMLDivElement>(null);
 
   const {
     filteredRecipes,
     isLoading,
     error,
-    searchRecipes,
     loadRecipes,
     clearFilters,
     loadTags,
     getPopularTags,
     applyFilters,
-    tags,
     nextPage,
     loadNextPage,
     isLoadingMore
@@ -146,8 +143,10 @@ const RecipeModal: React.FC<RecipeModalProps> = ({
       }
 
       if (Object.keys(filters).length > 0) {
+        // ИСПОЛЬЗУЕМ НОВЫЙ МЕТОД для поиска на бэкенде
         applyFilters(filters);
       } else {
+        // Если фильтров нет, загружаем базовые рецепты
         loadRecipes();
       }
     }, 300);

@@ -1,4 +1,4 @@
-// stores/recipeStore.ts - УБЕДИТЕСЬ ЧТО ВСЕ МЕТОДЫ СОХРАНЯЮТ nextPage
+// stores/recipeStore.ts - ДОБАВЛЯЕМ НОВЫЕ МЕТОДЫ
 import { create } from 'zustand';
 import { recipeService } from '../services/api';
 import type { Recipe, RecipeFilters, Tag } from '../types';
@@ -18,6 +18,7 @@ interface RecipeState {
   nextPage: string | null;
   isLoadingMore: boolean;
 
+  // Существующие методы
   loadRecipes: () => Promise<void>;
   searchRecipes: (query: string) => Promise<void>;
   applyFilters: (filters: RecipeFilters) => Promise<void>;
@@ -26,6 +27,10 @@ interface RecipeState {
   getPopularTags: () => Tag[];
   getRecipeById: (id: string) => Promise<Recipe>;
   loadNextPage: () => Promise<void>;
+
+  // НОВЫЕ МЕТОДЫ для поиска с пагинацией
+  searchWithPagination: (filters: RecipeFilters) => Promise<void>;
+  clearSearch: () => void;
 }
 
 export const useRecipeStore = create<RecipeState>((set, get) => ({
@@ -64,6 +69,39 @@ export const useRecipeStore = create<RecipeState>((set, get) => ({
     }
   },
 
+  // НОВЫЙ МЕТОД: Поиск с пагинацией через бэкенд
+  searchWithPagination: async (filters: RecipeFilters) => {
+    const { isSearchLoading } = get();
+    if (isSearchLoading) return;
+
+    set({ isSearchLoading: true, error: null });
+    try {
+      const response = await recipeService.search(filters);
+      set({
+        filteredRecipes: response.data.results,
+        filters,
+        nextPage: response.data.next,
+        isSearchLoading: false
+      });
+    } catch (error: any) {
+      set({
+        error: error.message,
+        isSearchLoading: false
+      });
+    }
+  },
+
+  // НОВЫЙ МЕТОД: Очистка поиска и возврат к базовым рецептам
+  clearSearch: () => {
+    const { recipes } = get();
+    set({
+      filteredRecipes: recipes,
+      filters: {},
+      nextPage: null
+    });
+  },
+
+  // Остальные методы остаются без изменений
   searchRecipes: async (query: string) => {
     const { isSearchLoading } = get();
     if (isSearchLoading) return;
@@ -94,7 +132,7 @@ export const useRecipeStore = create<RecipeState>((set, get) => ({
       set({
         filteredRecipes: response.data.results,
         filters,
-        nextPage: response.data.next, // ВАЖНО: сохраняем nextPage
+        nextPage: response.data.next,
         isSearchLoading: false
       });
     } catch (error: any) {

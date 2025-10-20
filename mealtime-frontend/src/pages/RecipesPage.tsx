@@ -1,3 +1,4 @@
+// RecipesPage.tsx - ИСПРАВЛЕННАЯ ВЕРСИЯ
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useRecipeStore } from '../stores/recipeStore';
@@ -8,25 +9,25 @@ const RecipesPage: React.FC = () => {
   const navigate = useNavigate();
   const {
     filteredRecipes,
-    recipes,
     isLoading,
     error,
-    searchRecipes,
     applyFilters,
-    clearFilters,
     loadRecipes,
     loadTags,
     getPopularTags,
-    tags,
     nextPage,
     loadNextPage,
-    isLoadingMore
+    isLoadingMore,
+    isSearchLoading
   } = useRecipeStore();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [maxCookingTime, setMaxCookingTime] = useState<number | ''>('');
   const [hasInitialized, setHasInitialized] = useState(false);
+
+  // ИСПРАВЛЕННАЯ СТРОКА - явно указываем тип и инициализируем
+  const searchTimeoutRef = useRef<number | null>(null);
 
   // Восстановление фильтров из localStorage и загрузка данных
   useEffect(() => {
@@ -39,10 +40,12 @@ const RecipesPage: React.FC = () => {
     }
 
     // Загружаем рецепты и теги при инициализации
-    loadRecipes();
-    loadTags().then(() => {
+    const initializeData = async () => {
+      await Promise.all([loadRecipes(), loadTags()]);
       setHasInitialized(true);
-    });
+    };
+
+    initializeData();
   }, [loadRecipes, loadTags]);
 
   // Сохранение фильтров в localStorage
@@ -55,7 +58,13 @@ const RecipesPage: React.FC = () => {
   useEffect(() => {
     if (!hasInitialized) return;
 
-    const timeoutId = setTimeout(() => {
+    // Очищаем предыдущий таймаут
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+      searchTimeoutRef.current = null;
+    }
+
+    searchTimeoutRef.current = setTimeout(() => {
       const filters: RecipeFilters = {};
 
       if (searchQuery.trim()) {
@@ -71,13 +80,20 @@ const RecipesPage: React.FC = () => {
       }
 
       if (Object.keys(filters).length > 0) {
+        // ИСПОЛЬЗУЕМ БЭКЕНД ДЛЯ ПОИСКА
         applyFilters(filters);
+      } else {
+        // Если фильтров нет, загружаем базовые рецепты
+        loadRecipes();
       }
-      // Если фильтров нет, НЕ вызываем clearFilters чтобы не сбросить nextPage
-    }, 300);
+    }, 500); // Увеличиваем debounce для лучшего UX
 
-    return () => clearTimeout(timeoutId);
-  }, [searchQuery, selectedTags, maxCookingTime, hasInitialized, applyFilters]);
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchQuery, selectedTags, maxCookingTime, hasInitialized, applyFilters, loadRecipes]);
 
   // Загрузка дополнительных рецептов
   const handleLoadMore = async () => {
@@ -101,14 +117,15 @@ const RecipesPage: React.FC = () => {
     setSearchQuery('');
     setSelectedTags([]);
     setMaxCookingTime('');
-    // При явном сбросе фильтров перезагружаем рецепты
+    // При явном сброе фильтров перезагружаем рецепты
     loadRecipes();
   };
 
-  // Используем recipes если filteredRecipes пуст (нет активных фильтров)
-  const displayRecipes = filteredRecipes.length > 0 ? filteredRecipes : recipes;
+  // Используем filteredRecipes для отображения (они содержат результаты поиска с бэкенда)
+  const displayRecipes = filteredRecipes;
   const popularTags = getPopularTags();
   const hasActiveFilters = selectedTags.length > 0 || maxCookingTime || searchQuery;
+  const isSearching = isSearchLoading && hasActiveFilters;
 
   // Структурированные данные для страницы рецептов
   const structuredData = {
@@ -163,14 +180,19 @@ const RecipesPage: React.FC = () => {
       {/* Поиск и фильтры */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
         {/* Строка поиска */}
-        <div className="mb-6">
+        <div className="mb-6 relative">
           <input
             type="text"
-            placeholder="Поиск рецептов..."
+            placeholder="Поиск рецептов по названию, ингредиентам или описанию..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="input-field w-full py-3 text-base"
+            className="input-field w-full py-3 text-base pr-10"
           />
+          {isSearching && (
+            <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-500"></div>
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -236,10 +258,20 @@ const RecipesPage: React.FC = () => {
             )}
           </div>
         </div>
+
+        {/* Статус поиска */}
+        {isSearching && (
+          <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <div className="flex items-center text-blue-700 text-sm">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-700 mr-2"></div>
+              Ищем рецепты по вашему запросу...
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Состояние загрузки */}
-      {isLoading && (
+      {isLoading && !hasActiveFilters && (
         <div className="flex justify-center items-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
           <span className="ml-3 text-gray-600">Загрузка рецептов...</span>
@@ -258,6 +290,21 @@ const RecipesPage: React.FC = () => {
         <>
           {displayRecipes.length > 0 ? (
             <>
+              {/* Информация о результатах поиска */}
+              {hasActiveFilters && (
+                <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
+                  <div className="text-green-700 text-sm">
+                    Найдено {displayRecipes.length} рецептов по вашему запросу
+                    {searchQuery && ` по запросу "${searchQuery}"`}
+                    {selectedTags.length > 0 && ` с тегами: ${selectedTags.map(tagId => {
+                      const tag = popularTags.find(t => t.id === tagId);
+                      return tag?.name;
+                    }).filter(Boolean).join(', ')}`}
+                    {maxCookingTime && ` с временем приготовления до ${maxCookingTime} минут`}
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {displayRecipes.map(recipe => (
                   <div
@@ -368,7 +415,7 @@ const RecipesPage: React.FC = () => {
             <div className="text-center py-12">
               <div className="text-gray-400 text-lg mb-4">
                 {hasActiveFilters
-                  ? 'Рецепты по вашему запросу не найдены'
+                  ? 'Рецепты по вашему запросу не найдены. Попробуйте изменить фильтры.'
                   : 'Рецепты не найдены'
                 }
               </div>
