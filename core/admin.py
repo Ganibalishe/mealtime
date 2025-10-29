@@ -13,6 +13,9 @@ from .models import (
     ShoppingListTemplate,
     TemplateItem,
     Tag,
+    PremiumMealPlan,
+    PremiumMealPlanRecipe,
+    UserPurchase,
 )
 
 
@@ -58,6 +61,21 @@ class TemplateItemInline(admin.TabularInline):
     raw_id_fields = ["ingredient"]
 
 
+# Inline для отображения рецептов в премиум меню
+class PremiumMealPlanRecipeInline(admin.TabularInline):
+    model = PremiumMealPlanRecipe
+    extra = 3
+    classes = ["collapse"]
+    raw_id_fields = ["recipe"]
+    ordering = ["day_number", "meal_type", "order"]
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "recipe":
+            # Показываем только премиум рецепты для выбора
+            kwargs["queryset"] = Recipe.objects.filter(is_premium=True)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+
 # Фильтры для админки
 class CookingMethodFilter(admin.SimpleListFilter):
     title = "Способ приготовления"
@@ -83,6 +101,30 @@ class ShoppingListStatusFilter(admin.SimpleListFilter):
     def queryset(self, request, queryset):
         if self.value():
             return queryset.filter(status=self.value())
+        return queryset
+
+
+class PremiumMealPlanStatusFilter(admin.SimpleListFilter):
+    title = "Статус меню"
+    parameter_name = "status"
+
+    def lookups(self, request, model_admin):
+        return [
+            ("active", "Активные"),
+            ("inactive", "Неактивные"),
+            ("free", "Бесплатные"),
+            ("paid", "Платные"),
+        ]
+
+    def queryset(self, request, queryset):
+        if self.value() == "active":
+            return queryset.filter(is_active=True)
+        elif self.value() == "inactive":
+            return queryset.filter(is_active=False)
+        elif self.value() == "free":
+            return queryset.filter(is_free=True)
+        elif self.value() == "paid":
+            return queryset.filter(is_free=False)
         return queryset
 
 
@@ -270,6 +312,7 @@ class IngredientAdmin(admin.ModelAdmin):
 
     recipe_count.short_description = "Используется в рецептах"
 
+
 @admin.register(Tag)
 class TagAdmin(admin.ModelAdmin):
     list_display = ["name", "color_preview", "recipe_count", "created_at"]
@@ -299,6 +342,7 @@ class TagAdmin(admin.ModelAdmin):
 
     recipe_count.short_description = "Количество рецептов"
 
+
 # Фильтр по тегам для рецептов
 class TagFilter(admin.SimpleListFilter):
     title = "Теги"
@@ -321,7 +365,9 @@ class RecipeAdmin(admin.ModelAdmin):
         "cooking_time",
         "difficulty_display",
         "cooking_method",
-        "tags_display",  # ДОБАВЛЕНО
+        "is_premium",
+        "premium_menus_count",
+        "tags_display",
         "ingredient_count",
         "image_preview",
     ]
@@ -329,17 +375,27 @@ class RecipeAdmin(admin.ModelAdmin):
         CookingMethodFilter,
         "difficulty",
         "cooking_time",
-        TagFilter,  # ДОБАВЛЕНО
+        TagFilter,
+        "is_premium",
     ]
-    search_fields = ["name", "description", "tags__name"]  # ДОБАВЛЕНО
+    list_editable = ["is_premium"]
+    search_fields = ["name", "description", "tags__name"]
     list_select_related = ["cooking_method"]
     inlines = [RecipeIngredientInline]
     readonly_fields = ["image_preview"]
-    filter_horizontal = ["tags"]  # ДОБАВЛЕНО: для удобного выбора тегов
+    filter_horizontal = ["tags"]
     fieldsets = (
         (
             "Основная информация",
-            {"fields": ("name", "description", "image", "image_preview")},
+            {
+                "fields": (
+                    "name",
+                    "description",
+                    "image",
+                    "image_preview",
+                    "is_premium",
+                )
+            },
         ),
         (
             "Детали приготовления",
@@ -349,7 +405,7 @@ class RecipeAdmin(admin.ModelAdmin):
             },
         ),
         (
-            "Теги",  # ДОБАВЛЕНО
+            "Теги",
             {
                 "fields": ("tags",),
                 "classes": ("collapse",),
@@ -363,7 +419,11 @@ class RecipeAdmin(admin.ModelAdmin):
 
     difficulty_display.short_description = "Сложность"
 
-    # ДОБАВЛЕНО: отображение тегов в списке
+    def premium_menus_count(self, obj):
+        return obj.premiummealplanrecipe_set.count()
+
+    premium_menus_count.short_description = "В меню"
+
     def tags_display(self, obj):
         tags = obj.tags.all()[:3]  # Показываем первые 3 тега
         tag_list = []
@@ -395,6 +455,20 @@ class RecipeAdmin(admin.ModelAdmin):
 
     image_preview.short_description = "Превью"
 
+    def mark_as_premium(self, request, queryset):
+        updated = queryset.update(is_premium=True)
+        self.message_user(request, f"{updated} рецептов отмечены как премиум")
+
+    mark_as_premium.short_description = "Отметить как премиум рецепты"
+
+    def mark_as_regular(self, request, queryset):
+        updated = queryset.update(is_premium=False)
+        self.message_user(request, f"{updated} рецептов отмечены как обычные")
+
+    mark_as_regular.short_description = "Отметить как обычные рецепты"
+
+    actions = [mark_as_premium, mark_as_regular]
+
 
 @admin.register(RecipeIngredient)
 class RecipeIngredientAdmin(admin.ModelAdmin):
@@ -422,6 +496,7 @@ class MealPlanAdmin(admin.ModelAdmin):
 
     recipes_count.short_description = "Количество рецептов"
 
+
 @admin.register(RecipeMealPlan)
 class RecipeMealPlanAdmin(admin.ModelAdmin):
     list_display = ["meal_plan", "recipe", "portions", "order"]
@@ -430,3 +505,166 @@ class RecipeMealPlanAdmin(admin.ModelAdmin):
     search_fields = ["meal_plan__user__username", "recipe__name"]
     list_select_related = ["meal_plan", "recipe"]
     raw_id_fields = ["meal_plan", "recipe"]
+
+
+@admin.register(PremiumMealPlan)
+class PremiumMealPlanAdmin(admin.ModelAdmin):
+    list_display = [
+        "name",
+        "price_display",
+        "is_free",
+        "duration_days",
+        "recipes_count",
+        "purchases_count",
+        "is_active",
+        "created_at",
+    ]
+    list_filter = [
+        PremiumMealPlanStatusFilter,
+        "duration_days",
+        "is_free",
+        "is_active",
+        "created_at",
+    ]
+    search_fields = ["name", "description"]
+    list_editable = ["is_active"]
+    inlines = [PremiumMealPlanRecipeInline]
+    readonly_fields = ["created_at", "updated_at"]
+    filter_horizontal = ["tags"]
+
+    fieldsets = (
+        (
+            "Основная информация",
+            {
+                "fields": (
+                    "name",
+                    "description",
+                    "price",
+                    "is_free",
+                    "duration_days",
+                    "is_active",
+                    "tags",
+                )
+            },
+        ),
+        (
+            "Даты",
+            {
+                "fields": ("created_at", "updated_at"),
+                "classes": ("collapse",),
+            },
+        ),
+    )
+
+    def price_display(self, obj):
+        if obj.is_free:
+            return "Бесплатно"
+        return f"{obj.price} руб."
+
+    price_display.short_description = "Стоимость"
+
+    def recipes_count(self, obj):
+        return obj.premium_recipes.count()
+
+    recipes_count.short_description = "Рецептов"
+
+    def recipes_count_display(self, obj):
+        return self.recipes_count(obj)
+
+    recipes_count_display.short_description = "Количество рецептов"
+
+    def purchases_count(self, obj):
+        return obj.userpurchase_set.count()
+
+    purchases_count.short_description = "Покупок"
+
+    def purchases_count_display(self, obj):
+        return self.purchases_count(obj)
+
+    purchases_count_display.short_description = "Количество покупок"
+
+    def activate_menus(self, request, queryset):
+        updated = queryset.update(is_active=True)
+        self.message_user(request, f"{updated} меню активированы")
+
+    activate_menus.short_description = "Активировать выбранные меню"
+
+    def deactivate_menus(self, request, queryset):
+        updated = queryset.update(is_active=False)
+        self.message_user(request, f"{updated} меню деактивированы")
+
+    deactivate_menus.short_description = "Деактивировать выбранные меню"
+
+    actions = [activate_menus, deactivate_menus]
+
+
+# Модель админки для PremiumMealPlanRecipe
+@admin.register(PremiumMealPlanRecipe)
+class PremiumMealPlanRecipeAdmin(admin.ModelAdmin):
+    list_display = [
+        "premium_meal_plan",
+        "day_number",
+        "meal_type_display",
+        "recipe",
+        "order",
+    ]
+    list_filter = ["day_number", "meal_type", "premium_meal_plan"]
+    list_editable = ["day_number", "order"]
+    search_fields = [
+        "premium_meal_plan__name",
+        "recipe__name",
+    ]
+    list_select_related = ["premium_meal_plan", "recipe"]
+    raw_id_fields = ["premium_meal_plan", "recipe"]
+
+    def meal_type_display(self, obj):
+        return obj.get_meal_type_display()
+
+    meal_type_display.short_description = "Прием пищи"
+
+
+# Модель админки для UserPurchase
+@admin.register(UserPurchase)
+class UserPurchaseAdmin(admin.ModelAdmin):
+    list_display = [
+        "user",
+        "premium_meal_plan",
+        "price_paid_display",
+        "purchase_date",
+    ]
+    list_filter = ["purchase_date", "premium_meal_plan"]
+    search_fields = [
+        "user__username",
+        "user__email",
+        "premium_meal_plan__name",
+    ]
+    list_select_related = ["user", "premium_meal_plan"]
+    readonly_fields = ["purchase_date"]
+    date_hierarchy = "purchase_date"
+
+    def price_paid_display(self, obj):
+        if obj.price_paid is None:
+            return "Бесплатно"
+        return f"{obj.price_paid} руб."
+
+    price_paid_display.short_description = "Оплаченная сумма"
+
+    fieldsets = (
+        (
+            "Основная информация",
+            {
+                "fields": (
+                    "user",
+                    "premium_meal_plan",
+                    "price_paid",
+                )
+            },
+        ),
+        (
+            "Системная информация",
+            {
+                "fields": ("purchase_date",),
+                "classes": ("collapse",),
+            },
+        ),
+    )

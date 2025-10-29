@@ -90,6 +90,40 @@ class Tag(models.Model):
         return self.color if self.color else "#808080"
 
 
+class PremiumMealPlan(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=200, verbose_name="Название меню")
+    description = models.TextField(verbose_name="Описание")
+    price = models.DecimalField(
+        max_digits=8, decimal_places=2, null=True, blank=True, verbose_name="Стоимость"
+    )
+    is_free = models.BooleanField(default=False, verbose_name="Бесплатное меню")
+    duration_days = models.IntegerField(
+        default=7, verbose_name="Продолжительность (дней)"
+    )
+    is_active = models.BooleanField(default=True, verbose_name="Активно")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    # Связи с существующими моделями
+    tags = models.ManyToManyField(Tag, blank=True, verbose_name="Теги")
+
+    class Meta:
+        verbose_name = "Премиум меню"
+        verbose_name_plural = "Премиум меню"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        free_label = " (Бесплатное)" if self.is_free else ""
+        return f"{self.name}{free_label}"
+
+    def save(self, *args, **kwargs):
+        # Автоматически помечаем как бесплатное если цена не указана
+        if self.price is None:
+            self.is_free = True
+        super().save(*args, **kwargs)
+
+
 class Recipe(models.Model):
     DIFFICULTY_LEVELS = [
         ("easy", "Легко"),
@@ -127,6 +161,14 @@ class Recipe(models.Model):
         upload_to="recipes/", blank=True, null=True, verbose_name="Изображение"
     )
     portions = models.PositiveIntegerField(default=2, verbose_name="Количество порций")
+    is_premium = models.BooleanField(default=False, verbose_name="Премиум рецепт")
+    available_in_premium_menus = models.ManyToManyField(
+        PremiumMealPlan,
+        through="PremiumMealPlanRecipe",
+        blank=True,
+        verbose_name="Доступен в премиум меню",
+        related_name="contained_recipes",
+    )
 
     class Meta:
         verbose_name = "Рецепт"
@@ -194,6 +236,35 @@ class MealPlan(models.Model):
         """Возвращает читаемое название приема пищи"""
         return dict(self.MEAL_TYPES).get(self.meal_type, self.meal_type)
 
+
+class PremiumMealPlanRecipe(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    premium_meal_plan = models.ForeignKey(
+        PremiumMealPlan, on_delete=models.CASCADE, related_name="premium_recipes"
+    )
+    recipe = models.ForeignKey(Recipe, on_delete=models.CASCADE, verbose_name="Рецепт")
+    day_number = models.IntegerField(
+        verbose_name="День меню"
+    )  # 1, 2, 3... duration_days
+    meal_type = models.CharField(
+        max_length=50,
+        choices=MealPlan.MEAL_TYPES,  # Используем существующие типы приемов пищи
+        verbose_name="Прием пищи",
+    )
+    order = models.PositiveIntegerField(default=0, verbose_name="Порядок")
+
+    class Meta:
+        verbose_name = "Рецепт в премиум меню"
+        verbose_name_plural = "Рецепты в премиум меню"
+        ordering = ["day_number", "meal_type", "order"]
+        unique_together = ["premium_meal_plan", "day_number", "meal_type", "order"]
+
+    def __str__(self):
+        return f"{self.premium_meal_plan.name} - День {self.day_number} - {self.get_meal_type_display()}"
+
+    def get_meal_type_display(self):
+        """Возвращает читаемое название приема пищи"""
+        return dict(MealPlan.MEAL_TYPES).get(self.meal_type, self.meal_type)
 
 class RecipeMealPlan(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -368,3 +439,30 @@ class TemplateItem(models.Model):
     def get_unit_display(self):
         """Возвращает читаемое название единицы измерения"""
         return dict(Ingredient.UNITS).get(self.unit, self.unit)
+
+
+class UserPurchase(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, verbose_name="Пользователь"
+    )
+    premium_meal_plan = models.ForeignKey(
+        PremiumMealPlan, on_delete=models.CASCADE, verbose_name="Премиум меню"
+    )
+    purchase_date = models.DateTimeField(auto_now_add=True, verbose_name="Дата покупки")
+    price_paid = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Оплаченная сумма",
+    )
+
+    class Meta:
+        verbose_name = "Покупка пользователя"
+        verbose_name_plural = "Покупки пользователей"
+        unique_together = ["user", "premium_meal_plan"]  # Одна покупка на меню
+        ordering = ["-purchase_date"]
+
+    def __str__(self):
+        return f"{self.user.username} - {self.premium_meal_plan.name}"

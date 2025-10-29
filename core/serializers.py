@@ -12,9 +12,13 @@ from .models import (
     ShoppingListTemplate,
     TemplateItem,
     Tag,
+    UserPurchase,
+    PremiumMealPlanRecipe,
+    PremiumMealPlan,
 )
 from django.contrib.auth.models import User
 from decimal import Decimal
+
 
 class FormattedDecimalField(serializers.DecimalField):
     """Кастомное поле для отображения decimal без лишних нулей"""
@@ -32,9 +36,14 @@ class FormattedDecimalField(serializers.DecimalField):
                 return int(decimal_value)
             else:
                 # Убираем лишние нули в конце
-                return representation.rstrip('0').rstrip('.') if '.' in representation else representation
+                return (
+                    representation.rstrip("0").rstrip(".")
+                    if "." in representation
+                    else representation
+                )
         except (ValueError, TypeError):
             return representation
+
 
 # Базовые сериализаторы
 class UserSerializer(serializers.ModelSerializer):
@@ -278,6 +287,9 @@ class RecipeSerializer(serializers.ModelSerializer):
     difficulty_display = serializers.CharField(
         source="get_difficulty_display", read_only=True
     )
+    # Добавляем поле для информации о доступе
+    user_has_access = serializers.SerializerMethodField()
+    accessible_through_menus = serializers.SerializerMethodField()
 
     class Meta:
         model = Recipe
@@ -296,7 +308,91 @@ class RecipeSerializer(serializers.ModelSerializer):
             "image",
             "portions",
             "ingredients",
+            "is_premium",
+            "user_has_access",
+            "accessible_through_menus",
         ]
+
+    def get_user_has_access(self, obj):
+        """Определяет, есть ли у пользователя доступ к рецепту"""
+        request = self.context.get('request')
+        if not request:
+            return not obj.is_premium
+
+        user = request.user
+
+        # Бесплатные рецепты доступны всем
+        if not obj.is_premium:
+            return True
+
+        # Премиум рецепты доступны только авторизованным пользователям с доступом
+        if user.is_authenticated:
+            # Проверяем, есть ли рецепт в купленных меню пользователя
+            from core.models import PremiumMealPlanRecipe
+            return PremiumMealPlanRecipe.objects.filter(
+                recipe=obj,
+                premium_meal_plan__userpurchase__user=user
+            ).exists()
+
+        return False
+
+    def get_accessible_through_menus(self, obj):
+        """Возвращает список меню, через которые доступен рецепт"""
+        request = self.context.get('request')
+        if not request or not obj.is_premium:
+            return []
+
+        user = request.user
+        if not user.is_authenticated:
+            return []
+
+        from core.models import PremiumMealPlanRecipe
+        accessible_menus = PremiumMealPlanRecipe.objects.filter(
+            recipe=obj,
+            premium_meal_plan__userpurchase__user=user
+        ).select_related('premium_meal_plan')[:5]  # Ограничиваем количество
+
+        return [
+            {
+                'menu_id': menu.premium_meal_plan.id,
+                'menu_name': menu.premium_meal_plan.name
+            }
+            for menu in accessible_menus
+        ]
+
+    def get_purchase_check(self, obj):
+        """Проверка доступа через покупки"""
+        if not obj.is_premium:
+            return "Free recipe - always accessible"
+
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return "Premium recipe - no access (not authenticated)"
+
+        from core.models import PremiumMealPlanRecipe, UserPurchase
+        user = request.user
+
+        # Проверяем доступ через покупки
+        has_access = PremiumMealPlanRecipe.objects.filter(
+            recipe=obj,
+            premium_meal_plan__userpurchase__user=user
+        ).exists()
+
+        if has_access:
+            # Получаем информацию о меню, через которые доступен
+            menus = PremiumMealPlanRecipe.objects.filter(
+                recipe=obj,
+                premium_meal_plan__userpurchase__user=user
+            ).select_related('premium_meal_plan')[:3]
+
+            menu_info = [{
+                'menu_id': str(menu.premium_meal_plan.id),
+                'menu_name': menu.premium_meal_plan.name
+            } for menu in menus]
+
+            return f"Premium recipe - ACCESS GRANTED through menus: {menu_info}"
+        else:
+            return "Premium recipe - NO ACCESS (not purchased)"
 
     def create(self, validated_data):
         tags_data = validated_data.pop("tags", [])
@@ -314,3 +410,99 @@ class RecipeSerializer(serializers.ModelSerializer):
             instance.tags.set(tags_data)
 
         return instance
+
+
+class PremiumMealPlanRecipeSerializer(serializers.ModelSerializer):
+    recipe_name = serializers.CharField(source="recipe.name", read_only=True)
+    recipe_image = serializers.ImageField(source="recipe.image", read_only=True)
+    recipe_cooking_time = serializers.IntegerField(
+        source="recipe.cooking_time", read_only=True
+    )
+    meal_type_display = serializers.CharField(
+        source="get_meal_type_display", read_only=True
+    )
+
+    class Meta:
+        model = PremiumMealPlanRecipe
+        fields = [
+            "id",
+            "day_number",
+            "meal_type",
+            "meal_type_display",
+            "recipe",
+            "recipe_name",
+            "recipe_image",
+            "recipe_cooking_time",
+            "order",
+        ]
+
+
+class PremiumMealPlanSerializer(serializers.ModelSerializer):
+    tags = TagSerializer(many=True, read_only=True)
+    premium_recipes = PremiumMealPlanRecipeSerializer(many=True, read_only=True)
+    is_purchased = serializers.SerializerMethodField()
+    recipes_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PremiumMealPlan
+        fields = [
+            "id",
+            "name",
+            "description",
+            "price",
+            "is_free",
+            "duration_days",
+            "is_active",
+            "tags",
+            "premium_recipes",
+            "is_purchased",
+            "recipes_count",
+            "created_at",
+        ]
+
+    def get_is_purchased(self, obj):
+        request = self.context.get("request")
+        if request and request.user.is_authenticated:
+            return UserPurchase.objects.filter(
+                user=request.user, premium_meal_plan=obj
+            ).exists()
+        return False
+
+    def get_recipes_count(self, obj):
+        return obj.premium_recipes.count()
+
+
+class PremiumMealPlanDetailSerializer(PremiumMealPlanSerializer):
+    """Расширенный сериализатор для детальной страницы"""
+
+    class Meta(PremiumMealPlanSerializer.Meta):
+        fields = PremiumMealPlanSerializer.Meta.fields + [
+            # Можно добавить дополнительные поля для детальной страницы
+        ]
+
+
+class UserPurchaseSerializer(serializers.ModelSerializer):
+    premium_meal_plan_name = serializers.CharField(
+        source="premium_meal_plan.name", read_only=True
+    )
+
+    class Meta:
+        model = UserPurchase
+        fields = [
+            "id",
+            "user",
+            "premium_meal_plan",
+            "premium_meal_plan_name",
+            "purchase_date",
+            "price_paid",
+        ]
+        read_only_fields = ["user", "purchase_date"]
+
+
+class ActivatePremiumMenuSerializer(serializers.Serializer):
+    start_date = serializers.DateField(required=True)
+
+
+class CreateMealPlanFromPremiumSerializer(serializers.Serializer):
+    premium_meal_plan_id = serializers.UUIDField(required=True)
+    start_date = serializers.DateField(required=True)
