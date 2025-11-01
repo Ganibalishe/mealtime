@@ -10,6 +10,8 @@ import ShoppingListPage from './pages/ShoppingListPage';
 import ShoppingListDetailPage from './pages/ShoppingListDetailPage';
 import RecipesPage from './pages/RecipesPage';
 import { useAuth } from './hooks/useAuth';
+import PremiumMenusPage from './pages/PremiumMenusPage';
+import PremiumMenuDetailPage from './pages/PremiumMenuDetailPage';
 
 // Компонент для проверки авторизации с загрузкой
 const AuthWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -44,7 +46,8 @@ function App() {
           <Route path="/" element={<PublicRoute><CalendarPage /></PublicRoute>} />
           <Route path="/recipes" element={<PublicRoute><RecipesPage /></PublicRoute>} />
           <Route path="/recipes/:id" element={<PublicRoute><RecipeDetailPage /></PublicRoute>} />
-
+          <Route path="/premium-menus" element={<Layout><PremiumMenusPage /></Layout>} />
+          <Route path="/premium-menus/:id" element={<Layout><PremiumMenuDetailPage /></Layout>} />
           {/* Защищенные страницы - только для авторизованных */}
           <Route path="/shopping-list" element={
             <AuthWrapper>

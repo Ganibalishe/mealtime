@@ -95,12 +95,10 @@ class RecipeViewSet(viewsets.ModelViewSet):
         Возвращает рецепты с учетом премиум доступа
         """
         queryset = Recipe.objects.prefetch_related(
-            "ingredients__ingredient",
-            "tags",
-            "cooking_method"
+            "ingredients__ingredient", "tags", "cooking_method"
         )
         if not self.request.user.is_authenticated:
-            return queryset.filter(is_premium=False).order_by('name')
+            return queryset.filter(is_premium=False).order_by("name")
 
         user = self.request.user
         purchased_premium_recipe_ids = self._get_purchased_premium_recipe_ids(user)
@@ -108,8 +106,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
         from django.db.models import Q
 
         final_queryset = queryset.filter(
-            Q(is_premium=False) |
-            Q(id__in=purchased_premium_recipe_ids)
+            Q(is_premium=False) | Q(id__in=purchased_premium_recipe_ids)
         )
 
         return final_queryset
@@ -612,6 +609,87 @@ class PremiumMealPlanViewSet(viewsets.ReadOnlyModelViewSet):
         context = super().get_serializer_context()
         context["request"] = self.request
         return context
+
+    @action(detail=True, methods=["post"])
+    def create_meal_plan_from_date(self, request, pk=None):
+        """
+        Создать план питания из премиум меню начиная с указанной даты
+        """
+        if not request.user.is_authenticated:
+            return Response(
+                {"error": "Требуется авторизация"}, status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        premium_meal_plan = self.get_object()
+
+        # Проверяем, что меню куплено
+        if not UserPurchase.objects.filter(
+            user=request.user, premium_meal_plan=premium_meal_plan
+        ).exists():
+            return Response(
+                {"error": "Это меню не активировано"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Валидация даты
+        start_date = request.data.get("start_date")
+        if not start_date:
+            return Response(
+                {"error": "Необходимо указать start_date"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Валидация количества порций
+        portions = request.data.get("portions", 2)  # Значение по умолчанию 2
+        try:
+            portions = int(portions)
+            if portions < 1 or portions > 20:
+                return Response(
+                    {"error": "Количество порций должно быть от 1 до 20"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        except (TypeError, ValueError):
+            return Response(
+                {"error": "Количество порций должно быть числом"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            from datetime import datetime
+
+            # Проверяем что дата валидна
+            datetime.strptime(start_date, "%Y-%m-%d")
+        except ValueError:
+            return Response(
+                {"error": "Неверный формат даты. Используйте YYYY-MM-DD"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            created_plans = create_meal_plan_from_premium(
+                request.user,
+                premium_meal_plan,
+                start_date,
+                portions,  # Передаем количество порций
+            )
+
+            return Response(
+                {
+                    "message": f"План питания успешно создан на {len(created_plans)} дней",
+                    "start_date": start_date,
+                    "portions": portions,
+                    "created_plans_count": len(created_plans),
+                    "premium_meal_plan": premium_meal_plan.name,
+                    "created_dates": [plan.date.isoformat() for plan in created_plans],
+                },
+                status=status.HTTP_201_CREATED,
+            )
+
+        except Exception as e:
+            return Response(
+                {"error": f"Ошибка при создании плана питания: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
     @action(detail=False, methods=["get"])
     def my_purchases(self, request):

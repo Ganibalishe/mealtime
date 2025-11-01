@@ -506,3 +506,15 @@ class ActivatePremiumMenuSerializer(serializers.Serializer):
 class CreateMealPlanFromPremiumSerializer(serializers.Serializer):
     premium_meal_plan_id = serializers.UUIDField(required=True)
     start_date = serializers.DateField(required=True)
+
+class CreateMealPlanFromDateSerializer(serializers.Serializer):
+    start_date = serializers.DateField(required=True)
+
+    def validate_start_date(self, value):
+        """
+        Проверяем что дата не в прошлом
+        """
+        from datetime import date
+        if value < date.today():
+            raise serializers.ValidationError("Дата не может быть в прошлом")
+        return value

@@ -129,3 +129,38 @@ export interface User {
     tags?: string[];
     max_time?: number;
   }
+  
+  export interface PremiumMealPlan {
+    id: string;
+    name: string;
+    description: string;
+    price: string | null;
+    is_free: boolean;
+    duration_days: number;
+    is_active: boolean;
+    tags: Tag[];
+    premium_recipes: PremiumMealPlanRecipe[];
+    is_purchased: boolean;
+    recipes_count: number;
+    created_at: string;
+  }
+
+  export interface PremiumMealPlanRecipe {
+    id: string;
+    day_number: number;
+    meal_type: string;
+    meal_type_display: string;
+    recipe: Recipe;
+    recipe_name: string;
+    recipe_image: string | null;
+    recipe_cooking_time: number;
+    order: number;
+  }
+
+  export interface PremiumMenuFilters {
+    q?: string;
+    tags?: string[];
+    is_free?: boolean;
+    duration_min?: number;
+    duration_max?: number;
+  }

@@ -17,15 +17,21 @@ def activate_premium_menu_for_user(user, premium_meal_plan):
     return purchase, created
 
 
-def create_meal_plan_from_premium(user, premium_meal_plan, start_date):
+def create_meal_plan_from_premium(user, premium_meal_plan, start_date, portions=2):
     """
     Создает план питания из премиум меню начиная с указанной даты
     """
     created_plans = []
 
+    # Преобразуем start_date в datetime.date если это строка
+    if isinstance(start_date, str):
+        from datetime import datetime
+        start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+
     # Проходим по всем рецептам в премиум меню
     for premium_recipe in premium_meal_plan.premium_recipes.all().select_related('recipe'):
         # Вычисляем дату для этого рецепта
+        from datetime import timedelta
         recipe_date = start_date + timedelta(days=premium_recipe.day_number - 1)
 
         # Создаем или получаем план питания на эту дату и прием пищи
@@ -36,14 +42,20 @@ def create_meal_plan_from_premium(user, premium_meal_plan, start_date):
             defaults={}
         )
 
-        # Создаем связь рецепта с планом питания
-        recipe_meal_plan = RecipeMealPlan.objects.create(
+        # Проверяем, нет ли уже этого рецепта в плане на этот день
+        existing_recipe = RecipeMealPlan.objects.filter(
             meal_plan=meal_plan,
-            recipe=premium_recipe.recipe,
-            portions=premium_recipe.recipe.portions,  # Используем порции из рецепта
-            order=premium_recipe.order
-        )
+            recipe=premium_recipe.recipe
+        ).first()
 
-        created_plans.append(meal_plan)
+        if not existing_recipe:
+            # Создаем связь рецепта с планом питания с указанным количеством порций
+            recipe_meal_plan = RecipeMealPlan.objects.create(
+                meal_plan=meal_plan,
+                recipe=premium_recipe.recipe,
+                portions=portions,  # Используем переданное количество порций
+                order=premium_recipe.order
+            )
+            created_plans.append(meal_plan)
 
     return created_plans

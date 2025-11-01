@@ -29,4 +29,7 @@ urlpatterns = [
         PremiumMealPlanViewSet.as_view({"post": "create_meal_plan"}),
         name="premium-create-meal-plan",
     ),
+    path('api/premium-meal-plans/<uuid:pk>/create_meal_plan_from_date/',
+         PremiumMealPlanViewSet.as_view({'post': 'create_meal_plan_from_date'}),
+         name='premium-create-meal-plan-from-date'),
 ]

@@ -1,4 +1,4 @@
-// components/Layout.tsx - ИСПРАВЛЕННАЯ ВЕРСИЯ
+// components/Layout.tsx - ОБНОВЛЕННАЯ ВЕРСИЯ С ГОТОВЫМИ МЕНЮ
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
@@ -19,6 +19,7 @@ const Layout: React.FC<LayoutProps> = ({ children, variant = 'default' }) => {
   const navigation = [
     { name: 'Календарь', href: '/', icon: '📅', mobileIcon: '📅' },
     { name: 'Рецепты', href: '/recipes', icon: '🍳', mobileIcon: '🍳' },
+    { name: 'Готовые меню', href: '/premium-menus', icon: '⭐', mobileIcon: '⭐' }, // ДОБАВЛЕНО
     ...(isAuthenticated ? [
       { name: 'Список покупок', href: '/shopping-list', icon: '🛒', mobileIcon: '🛒' }
     ] : [])
@@ -43,7 +44,7 @@ const Layout: React.FC<LayoutProps> = ({ children, variant = 'default' }) => {
     </footer>
   );
 
-  // Основной футер
+  // Основной футер - ОБНОВЛЕН С ССЫЛКОЙ НА ГОТОВЫЕ МЕНЮ
   const MainFooter = () => (
     <footer className="bg-white border-t border-gray-200 mt-auto">
       <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
@@ -69,6 +70,11 @@ const Layout: React.FC<LayoutProps> = ({ children, variant = 'default' }) => {
                   Все рецепты
                 </Link>
               </li>
+              <li>
+                <Link to="/premium-menus" className="text-gray-600 hover:text-gray-900">
+                  Готовые меню
+                </Link>
+              </li>
               {!isAuthenticated && (
                 <>
                   <li>
@@ -92,6 +98,7 @@ const Layout: React.FC<LayoutProps> = ({ children, variant = 'default' }) => {
               <li>📅 Планирование питания</li>
               <li>🛒 Списки покупок</li>
               <li>🍳 Библиотека рецептов</li>
+              <li>⭐ Готовые меню</li> {/* ОБНОВЛЕНО */}
               <li>👨‍👩‍👧‍👦 Для всей семьи</li>
             </ul>
           </div>
@@ -239,7 +246,7 @@ const Layout: React.FC<LayoutProps> = ({ children, variant = 'default' }) => {
         </div>
       </nav>
 
-      {/* Основной контент - ИСПРАВЛЕНА ЧАСТЬ ДЛЯ AUTH СТРАНИЦ */}
+      {/* Основной контент */}
       <main className={`flex-1 ${variant === 'default' ? 'py-6' : 'flex items-center justify-center py-12'}`}>
         {variant === 'default' ? (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
