@@ -58,6 +58,7 @@ const Layout: React.FC<LayoutProps> = ({ children, variant = 'default' }) => {
               и автоматически получайте списки покупок.
             </p>
             <div className="text-sm text-gray-500">
+              <p>Смирнов Илья Алексеевич</p>
               <p>ИНН: 772075772259</p>
             </div>
           </div>
@@ -121,6 +122,7 @@ const Layout: React.FC<LayoutProps> = ({ children, variant = 'default' }) => {
 
               <div>
                 <p className="font-medium text-gray-900">Реквизиты самозанятого:</p>
+                <p className="text-gray-600">Смирнов Илья Алексеевич</p>
                 <p className="text-gray-600">ИНН: 772075772259</p>
               </div>
 
