@@ -1,4 +1,4 @@
-// components/Layout.tsx - ОБНОВЛЕННАЯ ВЕРСИЯ С ГОТОВЫМИ МЕНЮ
+// components/Layout.tsx - ОБНОВЛЕННАЯ ВЕРСИЯ С ИНФОРМАЦИЕЙ ДЛЯ ЭКВАЙРИНГА
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
@@ -14,12 +14,13 @@ const Layout: React.FC<LayoutProps> = ({ children, variant = 'default' }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
   const isAuthenticated = useAuth();
 
   const navigation = [
     { name: 'Календарь', href: '/', icon: '📅', mobileIcon: '📅' },
     { name: 'Рецепты', href: '/recipes', icon: '🍳', mobileIcon: '🍳' },
-    { name: 'Готовые меню', href: '/premium-menus', icon: '⭐', mobileIcon: '⭐' }, // ДОБАВЛЕНО
+    { name: 'Готовые меню', href: '/premium-menus', icon: '⭐', mobileIcon: '⭐' },
     ...(isAuthenticated ? [
       { name: 'Список покупок', href: '/shopping-list', icon: '🛒', mobileIcon: '🛒' }
     ] : [])
@@ -44,19 +45,24 @@ const Layout: React.FC<LayoutProps> = ({ children, variant = 'default' }) => {
     </footer>
   );
 
-  // Основной футер - ОБНОВЛЕН С ССЫЛКОЙ НА ГОТОВЫЕ МЕНЮ
+  // Основной футер - ОБНОВЛЕН С ИНФОРМАЦИЕЙ ДЛЯ ЭКВАЙРИНГА
   const MainFooter = () => (
     <footer className="bg-white border-t border-gray-200 mt-auto">
       <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+          {/* О компании */}
           <div>
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Mealtime Planner</h3>
-            <p className="text-gray-600 text-sm">
+            <p className="text-gray-600 text-sm mb-4">
               Умный планировщик питания для всей семьи. Создавайте меню на неделю
               и автоматически получайте списки покупок.
             </p>
+            <div className="text-sm text-gray-500">
+              <p>ИНН: 772075772259</p>
+            </div>
           </div>
 
+          {/* Навигация */}
           <div>
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Навигация</h3>
             <ul className="space-y-2 text-sm">
@@ -92,22 +98,81 @@ const Layout: React.FC<LayoutProps> = ({ children, variant = 'default' }) => {
             </ul>
           </div>
 
+          {/* Возможности */}
           <div>
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Возможности</h3>
             <ul className="space-y-2 text-sm text-gray-600">
               <li>📅 Планирование питания</li>
               <li>🛒 Списки покупок</li>
               <li>🍳 Библиотека рецептов</li>
-              <li>⭐ Готовые меню</li> {/* ОБНОВЛЕНО */}
+              <li>⭐ Готовые меню</li>
               <li>👨‍👩‍👧‍👦 Для всей семьи</li>
             </ul>
           </div>
+
+          {/* Эквайринг и контакты */}
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Эквайринг и поддержка</h3>
+            <div className="space-y-3 text-sm">
+              <div>
+                <p className="font-medium text-gray-900">Контактные данные:</p>
+                <p className="text-gray-600">+7 (903) 281-50-16</p>
+              </div>
+
+              <div>
+                <p className="font-medium text-gray-900">Реквизиты самозанятого:</p>
+                <p className="text-gray-600">ИНН: 772075772259</p>
+              </div>
+
+              <div>
+                <button
+                  onClick={() => setShowTerms(!showTerms)}
+                  className="text-primary-600 hover:text-primary-700 font-medium text-left"
+                >
+                  Условия предоставления услуг и отказа от покупки
+                </button>
+
+                {showTerms && (
+                  <div className="mt-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="text-xs text-gray-600 space-y-2 max-h-40 overflow-y-auto">
+                      <h4 className="font-semibold text-sm mb-2">Условия предоставления услуг</h4>
+
+                      <p><strong>1. Общие положения</strong></p>
+                      <p>1.1. Настоящие условия регулируют порядок предоставления услуг по доступу к готовым меню питания через сервис Mealtime Planner.</p>
+
+                      <p><strong>2. Порядок оплаты и доступа</strong></p>
+                      <p>2.1. Оплата услуг производится через систему эквайринга.</p>
+                      <p>2.2. После успешной оплаты доступ к премиум меню предоставляется мгновенно.</p>
+                      <p>2.3. Все платежи обрабатываются защищенными платежными системами.</p>
+
+                      <p><strong>3. Отказ от покупки</strong></p>
+                      <p>3.1. В соответствии с законодательством РФ, отказ от цифрового товара возможен до момента его получения.</p>
+                      <p>3.2. После активации премиум меню и получения доступа к материалам возврат средств не производится.</p>
+                      <p>3.3. В случае технических ошибок при оплате, обратитесь в службу поддержки.</p>
+
+                      <p><strong>4. Контактная информация</strong></p>
+                      <p>4.1. По всем вопросам обращайтесь: +7 (903) 281-50-16</p>
+                      <p>4.2. Email: support@mealtime-planner.ru</p>
+
+                      <p className="text-xs mt-3">Дата последнего обновления: {new Date().toLocaleDateString('ru-RU')}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div className="border-t border-gray-200 mt-8 pt-8 text-center">
-          <p className="text-gray-500 text-sm">
-            © {new Date().getFullYear()} Mealtime Planner. Все права защищены.
-          </p>
+        {/* Нижняя часть футера */}
+        <div className="border-t border-gray-200 mt-8 pt-8">
+          <div className="flex flex-col md:flex-row justify-between items-center">
+            <p className="text-gray-500 text-sm">
+              © {new Date().getFullYear()} Mealtime Planner. Все права защищены.
+            </p>
+            <div className="mt-2 md:mt-0 text-xs text-gray-500">
+              <p>Сервис планирования питания</p>
+            </div>
+          </div>
         </div>
       </div>
     </footer>
