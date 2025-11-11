@@ -7,7 +7,7 @@ from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from .models import UserPurchase, PremiumMealPlan
 import logging
@@ -29,6 +29,7 @@ def get_robokassa_passwords():
 
 @csrf_exempt
 @api_view(['POST'])
+@permission_classes([AllowAny])  # ⬅️ ДОБАВЛЯЕМ ЭТУ СТРОЧКУ - разрешаем доступ без авторизации
 def payment_result(request):
     """
     Обработка уведомления от Robokassa (ResultURL)
@@ -43,6 +44,7 @@ def payment_result(request):
 
     try:
         add_log("=== НАЧАЛО ОБРАБОТКИ PAYMENT_RESULT ===")
+        add_log("✅ Эндпоинт доступен без авторизации")
 
         # Логируем ВСЕ входящие данные
         add_log(f"Метод запроса: {request.method}")
@@ -57,7 +59,7 @@ def payment_result(request):
             add_log("❌ ОШИБКА: Нет POST данных в запросе!")
             return HttpResponse('ERROR: No POST data', status=400)
 
-        # ИСПРАВЛЕНИЕ: Получаем параметры с учетом дублирования
+        # Получаем параметры
         out_sum = request.POST.get('OutSum') or request.POST.get('out_summ', '').strip()
         inv_id = request.POST.get('InvId') or request.POST.get('inv_id', '').strip()
         signature_value = request.POST.get('SignatureValue') or request.POST.get('crc', '').strip().upper()
@@ -90,7 +92,7 @@ def payment_result(request):
             add_log("❌ ОШИБКА: Отсутствует параметр SignatureValue")
             return HttpResponse('ERROR: Missing SignatureValue', status=400)
 
-        # ИСПРАВЛЕНИЕ: Преобразуем InvId в число
+        # Преобразуем InvId в число
         try:
             inv_id_int = int(inv_id)
             add_log(f"✅ InvId преобразован в число: {inv_id_int}")
@@ -119,7 +121,7 @@ def payment_result(request):
             add_log(f"❌ ОШИБКА: Не удалось получить пароли Robokassa: {str(e)}")
             return HttpResponse('ERROR: Cannot get Robokassa passwords', status=500)
 
-        # ИСПРАВЛЕНИЕ: Правильная база для расчета контрольной суммы
+        # Правильная база для расчета контрольной суммы
         signature_base = f"{out_sum}:{inv_id}:{password2}"
         add_log(f"🔢 База для подписи (без Shp): {signature_base}")
 
