@@ -34,69 +34,25 @@ def payment_result(request):
     """
     Обработка уведомления от Robokassa (ResultURL)
     """
-    log_lines = []
-
-    def add_log(message):
-        log_lines.append(message)
-        logger.info(message)
-        print(f"ROBOKASSA_DEBUG: {message}")
-
     try:
-        add_log("=== НАЧАЛО ОБРАБОТКИ PAYMENT_RESULT ===")
-        add_log("✅ Эндпоинт доступен без авторизации")
-
-        # Логируем ВСЕ входящие данные (БЕЗ request.body - он вызывает ошибку)
-        add_log(f"Метод запроса: {request.method}")
-        add_log(f"Content-Type: {request.content_type}")
-        add_log(f"Все заголовки: {dict(request.headers)}")
-        add_log(f"Все POST параметры: {dict(request.POST)}")
-        add_log(f"Все GET параметры: {dict(request.GET)}")
-        # УБИРАЕМ СТРОКУ: add_log(f"Тело запроса (raw): {request.body}") - она вызывает ошибку
-
-        # Проверяем, есть ли вообще данные
-        if not request.POST:
-            add_log("❌ ОШИБКА: Нет POST данных в запросе!")
-            return HttpResponse('ERROR: No POST data', status=400)
+        logger.info("Robokassa ResultURL request received")
 
         # Получаем параметры
         out_sum = request.POST.get('OutSum') or request.POST.get('out_summ', '').strip()
         inv_id = request.POST.get('InvId') or request.POST.get('inv_id', '').strip()
         signature_value = request.POST.get('SignatureValue') or request.POST.get('crc', '').strip().upper()
-        fee = request.POST.get('Fee', '0').strip()
-        email = request.POST.get('EMail', '').strip()
-        payment_method = request.POST.get('PaymentMethod', '').strip()
-        inc_curr_label = request.POST.get('IncCurrLabel', '').strip()
         is_test = request.POST.get('IsTest', '0').strip()
 
-        add_log(f"📋 РАСПАРСЕННЫЕ ПАРАМЕТРЫ:")
-        add_log(f"  OutSum: '{out_sum}'")
-        add_log(f"  InvId: '{inv_id}'")
-        add_log(f"  SignatureValue: '{signature_value}'")
-        add_log(f"  Fee: '{fee}'")
-        add_log(f"  EMail: '{email}'")
-        add_log(f"  PaymentMethod: '{payment_method}'")
-        add_log(f"  IncCurrLabel: '{inc_curr_label}'")
-        add_log(f"  IsTest: '{is_test}'")
-
         # Проверяем обязательные параметры
-        if not out_sum:
-            add_log("❌ ОШИБКА: Отсутствует параметр OutSum")
-            return HttpResponse('ERROR: Missing OutSum', status=400)
-
-        if not inv_id:
-            add_log("❌ ОШИБКА: Отсутствует параметр InvId")
-            return HttpResponse('ERROR: Missing InvId', status=400)
-
-        if not signature_value:
-            add_log("❌ ОШИБКА: Отсутствует параметр SignatureValue")
-            return HttpResponse('ERROR: Missing SignatureValue', status=400)
+        if not out_sum or not inv_id or not signature_value:
+            logger.error(f"Missing required parameters: OutSum={out_sum}, InvId={inv_id}, SignatureValue={signature_value}")
+            return HttpResponse('ERROR: Missing required parameters', status=400)
 
         # Преобразуем InvId в число
         try:
             inv_id_int = int(inv_id)
-            add_log(f"✅ InvId преобразован в число: {inv_id_int}")
-        except (TypeError, ValueError) as e:
-            add_log(f"❌ ОШИБКА: Неверный формат InvId: {inv_id}, ошибка: {str(e)}")
+        except (TypeError, ValueError):
+            logger.error(f"Invalid InvId format: {inv_id}")
             return HttpResponse('ERROR: Invalid InvId format', status=400)
 
         # Собираем пользовательские параметры (Shp_*)
@@ -104,129 +60,62 @@ def payment_result(request):
         for key, value in request.POST.items():
             if key.startswith('Shp_'):
                 shp_params[key] = value.strip()
-                add_log(f"  Пользовательский параметр: {key} = {value}")
-
-        add_log(f"📦 Найдено пользовательских параметров: {len(shp_params)}")
 
         # Сортируем пользовательские параметры по алфавиту
         sorted_shp_params = sorted(shp_params.items())
-        add_log(f"📦 Отсортированные Shp параметры: {sorted_shp_params}")
 
         # Получаем пароль для проверки подписи
-        try:
-            password1, password2 = get_robokassa_passwords()
-            add_log(f"🔑 Получены пароли Robokassa (первые 5 символов password2): {password2[:5]}...")
-        except Exception as e:
-            add_log(f"❌ ОШИБКА: Не удалось получить пароли Robokassa: {str(e)}")
-            return HttpResponse('ERROR: Cannot get Robokassa passwords', status=500)
+        password1, password2 = get_robokassa_passwords()
 
         # Правильная база для расчета контрольной суммы
         signature_base = f"{out_sum}:{inv_id}:{password2}"
-        add_log(f"🔢 База для подписи (без Shp): {signature_base}")
 
         # Добавляем пользовательские параметры если они есть
         for key, value in sorted_shp_params:
             signature_base += f":{key}={value}"
 
-        add_log(f"🔢 Полная база для подписи: {signature_base}")
-
         # Рассчитываем ожидаемую подпись (MD5 в верхнем регистре)
         expected_signature = hashlib.md5(signature_base.encode('utf-8')).hexdigest().upper()
-        add_log(f"✅ Рассчитанная подпись: {expected_signature}")
-        add_log(f"📨 Полученная подпись: {signature_value}")
 
         # Проверяем подпись
         if signature_value != expected_signature:
-            add_log(f"❌ ОШИБКА: Неверная подпись!")
-            add_log(f"   Ожидалось: {expected_signature}")
-            add_log(f"   Получено:  {signature_value}")
-            add_log(f"   База была: {signature_base}")
+            logger.error(f"Invalid signature for order #{inv_id}. Received: {signature_value}, Expected: {expected_signature}")
             return HttpResponse('ERROR: Invalid signature', status=400)
-        else:
-            add_log("✅ Подпись верна!")
 
         # Ищем покупку по order_number
-        add_log(f"🔍 Поиск покупки с order_number: {inv_id_int}")
         try:
             purchase = UserPurchase.objects.get(order_number=inv_id_int)
-            add_log(f"✅ Покупка найдена: {purchase.id}, статус: {purchase.status}")
-            add_log(f"   Цена в покупке: {purchase.price_paid}")
-            add_log(f"   Полученная сумма: {out_sum}")
 
-            # Проверяем сумму
+            # Проверяем сумму (в тестовом режиме пропускаем несовпадение)
             expected_amount = str(purchase.price_paid) if purchase.price_paid else '0'
-            add_log(f"💰 Сравнение сумм: ожидаемая '{expected_amount}' vs полученная '{out_sum}'")
 
-            # Нормализуем суммы для сравнения
             try:
                 received_amount_normalized = str(float(out_sum))
                 expected_amount_normalized = str(float(expected_amount))
-                add_log(f"💰 Нормализованные суммы: полученная '{received_amount_normalized}' vs ожидаемая '{expected_amount_normalized}'")
-            except ValueError as e:
-                add_log(f"⚠️  Предупреждение: ошибка нормализации сумм: {str(e)}")
+            except ValueError:
                 received_amount_normalized = out_sum
                 expected_amount_normalized = expected_amount
 
             if received_amount_normalized != expected_amount_normalized:
-                add_log(f"⚠️  Предупреждение: несовпадение сумм для заказа #{inv_id}")
-                add_log(f"   Получено: {received_amount_normalized}")
-                add_log(f"   Ожидалось: {expected_amount_normalized}")
-                # В тестовом режиме можем пропустить, в боевом - нужно проверять строго
+                logger.warning(f"Amount mismatch for order #{inv_id}. Received: {received_amount_normalized}, Expected: {expected_amount_normalized}")
                 if not getattr(settings, 'ROBOKASSA_TEST_MODE', True) and is_test != '1':
-                    add_log("❌ ОШИБКА: Несовпадение сумм в боевом режиме")
                     return HttpResponse('ERROR: Amount mismatch', status=400)
-                else:
-                    add_log("✅ Несовпадение сумм проигнорировано (тестовый режим)")
 
             # Обновляем статус покупки
-            add_log(f"🔄 Обновление статуса покупки на 'paid'")
             purchase.status = 'paid'
             purchase.save()
-            add_log(f"✅ Статус покупки обновлен")
 
-            add_log(f"🎉 Заказ #{inv_id} успешно обработан и помечен как оплаченный")
-
-            # СОХРАНЯЕМ ЛОГ В ФАЙЛ
-            try:
-                with open('/tmp/robokassa_payment_log.txt', 'a', encoding='utf-8') as f:
-                    f.write("\n".join(log_lines) + "\n" + "="*50 + "\n")
-            except Exception as e:
-                add_log(f"⚠️  Не удалось сохранить лог в файл: {str(e)}")
+            logger.info(f"Order #{inv_id} successfully marked as paid")
 
             # Robokassa ожидает ответ в формате OK{InvId}
-            response_text = f'OK{inv_id}'
-            add_log(f"📤 Отправляем ответ Robokassa: {response_text}")
-            return HttpResponse(response_text, content_type='text/plain')
+            return HttpResponse(f'OK{inv_id}', content_type='text/plain')
 
         except UserPurchase.DoesNotExist:
-            add_log(f"❌ ОШИБКА: Заказ не найден в базе: #{inv_id_int}")
-            # Логируем все существующие заказы для отладки
-            try:
-                all_orders = UserPurchase.objects.values('id', 'order_number', 'status')[:10]
-                add_log(f"📋 Последние 10 заказов в базе: {list(all_orders)}")
-            except Exception as e:
-                add_log(f"⚠️  Не удалось получить список заказов: {str(e)}")
-
+            logger.error(f"Order not found: #{inv_id_int}")
             return HttpResponse('ERROR: Order not found', status=404)
 
-        except Exception as e:
-            add_log(f"❌ ОШИБКА при обработке заказа #{inv_id}: {str(e)}")
-            import traceback
-            add_log(f"TRACEBACK: {traceback.format_exc()}")
-            return HttpResponse(f'ERROR: {str(e)}', status=500)
-
     except Exception as e:
-        add_log(f"❌ НЕОЖИДАННАЯ ОШИБКА в payment_result: {str(e)}")
-        import traceback
-        add_log(f"TRACEBACK: {traceback.format_exc()}")
-
-        # Сохраняем лог при ошибке
-        try:
-            with open('/tmp/robokassa_payment_errors.txt', 'a', encoding='utf-8') as f:
-                f.write("\n".join(log_lines) + "\n" + "="*50 + "\n")
-        except:
-            pass
-
+        logger.error(f"Unexpected error in payment_result: {str(e)}")
         return HttpResponse('ERROR: Internal server error', status=500)
 
 
