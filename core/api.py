@@ -8,6 +8,7 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 from django.db.models import Q
 from django.utils import timezone
 from datetime import timedelta
+from datetime import datetime
 from .models import *
 from .serializers import *
 from .services import activate_premium_menu_for_user, create_meal_plan_from_premium
@@ -622,14 +623,28 @@ class PremiumMealPlanViewSet(viewsets.ReadOnlyModelViewSet):
 
         premium_meal_plan = self.get_object()
 
-        # Проверяем, что меню куплено
-        if not UserPurchase.objects.filter(
+        # ОБНОВЛЕНО: Проверяем, что меню куплено И статус оплачен
+        purchase = UserPurchase.objects.filter(
             user=request.user, premium_meal_plan=premium_meal_plan
-        ).exists():
+        ).first()
+
+        if not purchase:
             return Response(
                 {"error": "Это меню не активировано"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        if purchase.status != 'paid':
+            if purchase.status == 'processing':
+                return Response(
+                    {"error": "Оплата этого меню еще не завершена. Дождитесь подтверждения платежа."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            elif purchase.status == 'cancelled':
+                return Response(
+                    {"error": "Платеж за это меню был отменен. Пожалуйста, попробуйте снова."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         # Валидация даты
         start_date = request.data.get("start_date")
@@ -655,8 +670,6 @@ class PremiumMealPlanViewSet(viewsets.ReadOnlyModelViewSet):
             )
 
         try:
-            from datetime import datetime
-
             # Проверяем что дата валидна
             datetime.strptime(start_date, "%Y-%m-%d")
         except ValueError:
@@ -719,23 +732,96 @@ class PremiumMealPlanViewSet(viewsets.ReadOnlyModelViewSet):
 
         premium_meal_plan = self.get_object()
 
-        # Проверяем, не куплено ли уже это меню
-        if UserPurchase.objects.filter(
+        # ОБНОВЛЕНО: Проверяем существующую покупку
+        existing_purchase = UserPurchase.objects.filter(
             user=request.user, premium_meal_plan=premium_meal_plan
-        ).exists():
-            return Response(
-                {"error": "Это меню уже активировано"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        ).first()
+
+        if existing_purchase:
+            if existing_purchase.status == 'processing':
+                return Response(
+                    {
+                        "error": "Оплата этого меню уже в обработке",
+                        "purchase_status": "processing",
+                        "requires_payment": not premium_meal_plan.is_free
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            elif existing_purchase.status == 'paid':
+                return Response(
+                    {
+                        "error": "Это меню уже активировано",
+                        "purchase_status": "paid"
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            elif existing_purchase.status == 'cancelled':
+                # Если покупка была отменена, обновляем ее
+                existing_purchase.status = 'processing'
+                existing_purchase.purchase_date = timezone.now()
+                if premium_meal_plan.is_free:
+                    existing_purchase.status = 'paid'
+                    existing_purchase.price_paid = 0
+                else:
+                    existing_purchase.price_paid = premium_meal_plan.price
+                existing_purchase.save()
+
+                serializer = UserPurchaseSerializer(existing_purchase)
+                return Response(
+                    {
+                        "message": "Меню успешно активировано" if premium_meal_plan.is_free else "Запрос на оплату создан",
+                        "purchase": serializer.data,
+                        "requires_payment": not premium_meal_plan.is_free,
+                        "purchase_status": existing_purchase.status
+                    },
+                    status=status.HTTP_200_OK,
+                )
 
         try:
-            purchase, created = activate_premium_menu_for_user(
-                request.user, premium_meal_plan
-            )
+            # ОБНОВЛЕНО: Для бесплатных меню сразу ставим статус paid
+            if premium_meal_plan.is_free:
+                purchase, created = UserPurchase.objects.get_or_create(
+                    user=request.user,
+                    premium_meal_plan=premium_meal_plan,
+                    defaults={
+                        'price_paid': 0,
+                        'status': 'paid'
+                    }
+                )
+
+                # Если запись уже существовала, но статус был другим - обновляем
+                if not created:
+                    purchase.status = 'paid'
+                    purchase.price_paid = 0
+                    purchase.purchase_date = timezone.now()
+                    purchase.save()
+            else:
+                # Для платных меню создаем запись со статусом processing
+                purchase, created = UserPurchase.objects.get_or_create(
+                    user=request.user,
+                    premium_meal_plan=premium_meal_plan,
+                    defaults={
+                        'price_paid': premium_meal_plan.price,
+                        'status': 'processing'
+                    }
+                )
+
+                # Если запись уже существовала, но статус был другим - обновляем
+                if not created:
+                    purchase.status = 'processing'
+                    purchase.price_paid = premium_meal_plan.price
+                    purchase.purchase_date = timezone.now()
+                    purchase.save()
+
             serializer = UserPurchaseSerializer(purchase)
 
             return Response(
-                {"message": "Меню успешно активировано", "purchase": serializer.data},
+                {
+                    "message": "Меню успешно активировано" if premium_meal_plan.is_free else "Запрос на оплату создан",
+                    "purchase": serializer.data,
+                    "requires_payment": not premium_meal_plan.is_free,
+                    "purchase_status": purchase.status
+                },
                 status=status.HTTP_201_CREATED,
             )
 
@@ -761,26 +847,42 @@ class PremiumMealPlanViewSet(viewsets.ReadOnlyModelViewSet):
 
         premium_meal_plan_id = serializer.validated_data["premium_meal_plan_id"]
         start_date = serializer.validated_data["start_date"]
+        portions = serializer.validated_data.get("portions", 2)
 
         try:
-            # Проверяем, что меню куплено
-            if not UserPurchase.objects.filter(
+            # ОБНОВЛЕНО: Проверяем, что меню куплено и оплачено
+            purchase = UserPurchase.objects.filter(
                 user=request.user, premium_meal_plan_id=premium_meal_plan_id
-            ).exists():
+            ).first()
+
+            if not purchase:
                 return Response(
                     {"error": "Это меню не активировано"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
+            if purchase.status != 'paid':
+                if purchase.status == 'processing':
+                    return Response(
+                        {"error": "Оплата этого меню еще не завершена. Дождитесь подтверждения платежа."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                elif purchase.status == 'cancelled':
+                    return Response(
+                        {"error": "Платеж за это меню был отменен. Пожалуйста, попробуйте снова."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
             premium_meal_plan = PremiumMealPlan.objects.get(id=premium_meal_plan_id)
             created_plans = create_meal_plan_from_premium(
-                request.user, premium_meal_plan, start_date
+                request.user, premium_meal_plan, start_date, portions
             )
 
             return Response(
                 {
                     "message": f"План питания успешно создан на {len(created_plans)} дней",
                     "start_date": start_date,
+                    "portions": portions,
                     "created_plans_count": len(created_plans),
                     "premium_meal_plan": premium_meal_plan.name,
                 },
@@ -797,6 +899,68 @@ class PremiumMealPlanViewSet(viewsets.ReadOnlyModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
+    @action(detail=True, methods=["get"])
+    def purchase_status(self, request, pk=None):
+        """
+        Получить статус покупки текущего пользователя для этого меню
+        """
+        if not request.user.is_authenticated:
+            return Response(
+                {"error": "Требуется авторизация"}, status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        premium_meal_plan = self.get_object()
+
+        purchase = UserPurchase.objects.filter(
+            user=request.user, premium_meal_plan=premium_meal_plan
+        ).first()
+
+        if purchase:
+            serializer = UserPurchaseSerializer(purchase)
+            return Response({
+                "has_purchase": True,
+                "purchase_status": purchase.status,
+                "purchase_details": serializer.data
+            })
+        else:
+            return Response({
+                "has_purchase": False,
+                "purchase_status": None
+            })
+
+    @action(detail=True, methods=["post"])
+    def cancel_purchase(self, request, pk=None):
+        """
+        Отменить покупку (только для статусов processing)
+        """
+        if not request.user.is_authenticated:
+            return Response(
+                {"error": "Требуется авторизация"}, status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        premium_meal_plan = self.get_object()
+
+        purchase = UserPurchase.objects.filter(
+            user=request.user,
+            premium_meal_plan=premium_meal_plan,
+            status='processing'
+        ).first()
+
+        if not purchase:
+            return Response(
+                {"error": "Активная покупка в обработке не найдена"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        purchase.status = 'cancelled'
+        purchase.save()
+
+        serializer = UserPurchaseSerializer(purchase)
+
+        return Response({
+            "message": "Покупка отменена",
+            "purchase": serializer.data
+        })
 
 class UserPurchaseViewSet(viewsets.ReadOnlyModelViewSet):
     """

@@ -2,12 +2,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePremiumMenuStore } from '../stores/premiumMenuStore';
+import { usePaymentStore } from '../stores/paymentStore';
+import { useAuth } from '../hooks/useAuth';
 import type { PremiumMenuFilters } from '../types';
 import SeoHead from '../components/SeoHead';
 import CreatePlanModal from '../components/CreatePlanModal';
+import { robokassaService } from '../services/robokassa';
 
 const PremiumMenusPage: React.FC = () => {
   const navigate = useNavigate();
+  const isAuthenticated = useAuth();
+
   const {
     filteredMenus,
     isLoading,
@@ -24,12 +29,20 @@ const PremiumMenusPage: React.FC = () => {
     clearFilters
   } = usePremiumMenuStore();
 
+  const {
+    createPayment,
+    paymentLoading,
+    paymentError,
+    clearPaymentError
+  } = usePaymentStore();
+
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [durationRange, setDurationRange] = useState<{ min: number | ''; max: number | '' }>({ min: '', max: '' });
   const [showFreeOnly, setShowFreeOnly] = useState(false);
   const [hasInitialized, setHasInitialized] = useState(false);
   const [activationLoading, setActivationLoading] = useState<string | null>(null);
+  const [paymentMenuId, setPaymentMenuId] = useState<string | null>(null);
 
   // Состояния для модального окна создания плана
   const [isCreatePlanModalOpen, setIsCreatePlanModalOpen] = useState(false);
@@ -118,6 +131,7 @@ const PremiumMenusPage: React.FC = () => {
   const handleActivateMenu = async (menuId: string) => {
     setActivationLoading(menuId);
     clearError();
+    clearPaymentError();
 
     try {
       await activateMenu(menuId);
@@ -129,6 +143,28 @@ const PremiumMenusPage: React.FC = () => {
     }
   };
 
+  // Обработчик платежа через Robokassa
+  const handlePayment = async (menuId: string) => {
+    setPaymentMenuId(menuId);
+    clearError();
+    clearPaymentError();
+
+    try {
+      // Загружаем скрипт Robokassa
+      await robokassaService.loadScript();
+
+      // Получаем параметры платежа с бэкенда
+      const paymentData = await createPayment(menuId);
+
+      // Запускаем платеж - теперь payment_params правильного типа
+      robokassaService.startPayment(paymentData.payment_params);
+
+    } catch (error: any) {
+      console.error('Ошибка при запуске платежа:', error.message);
+    } finally {
+      setPaymentMenuId(null);
+    }
+  };
   // Обработчик открытия модального окна создания плана
   const handleOpenCreatePlanModal = (menuId: string, menuName: string, durationDays: number) => {
     setSelectedMenuForPlan({ id: menuId, name: menuName, duration: durationDays });
@@ -141,6 +177,7 @@ const PremiumMenusPage: React.FC = () => {
 
     setCreatePlanLoading(selectedMenuForPlan.id);
     clearError();
+    clearPaymentError();
 
     try {
       await createMealPlanFromDate(selectedMenuForPlan.id, startDate, portions);
@@ -161,6 +198,7 @@ const PremiumMenusPage: React.FC = () => {
     setDurationRange({ min: '', max: '' });
     setShowFreeOnly(false);
     clearFilters();
+    clearPaymentError();
   };
 
   // Получаем все уникальные теги из меню
@@ -220,6 +258,19 @@ const PremiumMenusPage: React.FC = () => {
         <h2 className="text-3xl font-bold text-gray-900 mb-2">Готовые меню</h2>
         <p className="text-gray-600">Профессионально составленные рационы для вашего удобства</p>
       </div>
+
+      {/* Сообщение об ошибке платежа */}
+      {paymentError && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+          <div className="text-red-700 text-sm mb-2">{paymentError}</div>
+          <button
+            onClick={clearPaymentError}
+            className="text-red-600 hover:text-red-800 text-sm font-medium"
+          >
+            Закрыть
+          </button>
+        </div>
+      )}
 
       {/* Поиск и фильтры */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
@@ -377,139 +428,202 @@ const PremiumMenusPage: React.FC = () => {
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredMenus.map(menu => (
-                  <div
-                    key={menu.id}
-                    className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-all duration-200 group"
-                  >
-                    {/* Карточка меню */}
-                    <div className="p-4">
-                      {/* Заголовок и описание */}
-                      <div className="mb-3">
-                        <h3 className="font-semibold text-lg text-gray-900 mb-2 line-clamp-2 group-hover:text-primary-600 transition-colors">
-                          {menu.name}
-                        </h3>
-                        {menu.description && (
-                          <p className="text-gray-600 text-sm line-clamp-3">
-                            {menu.description}
-                          </p>
-                        )}
-                      </div>
+                {filteredMenus.map(menu => {
+                  const isPaid = menu.is_purchased && menu.purchase_status === 'paid';
+                  const isProcessing = menu.purchase_status === 'processing';
+                  const isCurrentPayment = paymentMenuId === menu.id;
+                  const isCurrentActivation = activationLoading === menu.id;
+                  const isCurrentPlanCreation = createPlanLoading === menu.id;
 
-                      {/* Цена и длительность */}
-                      <div className="flex justify-between items-center mb-3">
-                        <div className="flex items-center space-x-2">
-                          <span className={`text-lg font-bold ${
-                            menu.is_free ? 'text-green-600' : 'text-accent-600'
-                          }`}>
-                            {menu.is_free ? 'Бесплатно' : `${menu.price} ₽`}
-                          </span>
-                        </div>
-                        <span className="bg-primary-100 text-primary-700 px-2 py-1 rounded text-xs">
-                          {menu.duration_days} дней
-                        </span>
-                      </div>
-
-                      {/* Теги */}
-                      {menu.tags && menu.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mb-3">
-                          {menu.tags.slice(0, 3).map(tag => (
-                            <span
-                              key={tag.id}
-                              className="px-2 py-1 rounded-full text-xs text-white"
-                              style={{ backgroundColor: tag.color || '#6B7280' }}
-                            >
-                              {tag.name}
-                            </span>
-                          ))}
-                          {menu.tags.length > 3 && (
-                            <span className="px-2 py-1 rounded-full text-xs bg-gray-200 text-gray-600">
-                              +{menu.tags.length - 3}
-                            </span>
+                  return (
+                    <div
+                      key={menu.id}
+                      className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-all duration-200 group"
+                    >
+                      {/* Карточка меню */}
+                      <div className="p-4">
+                        {/* Заголовок и описание */}
+                        <div className="mb-3">
+                          <h3 className="font-semibold text-lg text-gray-900 mb-2 line-clamp-2 group-hover:text-primary-600 transition-colors">
+                            {menu.name}
+                          </h3>
+                          {menu.description && (
+                            <p className="text-gray-600 text-sm line-clamp-3">
+                              {menu.description}
+                            </p>
                           )}
                         </div>
-                      )}
 
-                      {/* Информация о рецептах */}
-                      <div className="flex justify-between items-center text-sm text-gray-500 mb-4">
-                        <span>🍽️ {menu.recipes_count} рецептов</span>
-                        <span>{menu.premium_recipes.length} приемов пищи</span>
-                      </div>
+                        {/* Цена и длительность */}
+                        <div className="flex justify-between items-center mb-3">
+                          <div className="flex items-center space-x-2">
+                            <span className={`text-lg font-bold ${
+                              menu.is_free ? 'text-green-600' : 'text-accent-600'
+                            }`}>
+                              {menu.is_free ? 'Бесплатно' : `${menu.price} ₽`}
+                            </span>
+                          </div>
+                          <span className="bg-primary-100 text-primary-700 px-2 py-1 rounded text-xs">
+                            {menu.duration_days} дней
+                          </span>
+                        </div>
 
-                      {/* Кнопки действий */}
-                      <div className="space-y-2">
-                        {menu.is_purchased ? (
-                          <>
-                            <button
-                              onClick={() => handleOpenCreatePlanModal(menu.id, menu.name, menu.duration_days)}
-                              disabled={createPlanLoading === menu.id}
-                              className="w-full bg-primary-500 hover:bg-primary-600 text-white py-2 px-4 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
-                            >
-                              {createPlanLoading === menu.id ? (
-                                <div className="flex items-center justify-center gap-2">
-                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                                  <span>Создание...</span>
-                                </div>
-                              ) : (
-                                'Создать план питания'
-                              )}
-                            </button>
-
-                            {/* КНОПКА ПОДРОБНЕЕ ДЛЯ АКТИВИРОВАННЫХ МЕНЮ */}
-                            <button
-                              onClick={() => navigate(`/premium-menus/${menu.id}`)}
-                              className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-4 rounded-lg transition-colors duration-200 text-sm font-medium"
-                            >
-                              Подробнее о меню
-                            </button>
-
-                            <div className="text-center">
-                              <span className="text-green-600 text-xs">✓ Меню активировано</span>
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <button
-                              onClick={() => handleActivateMenu(menu.id)}
-                              disabled={activationLoading === menu.id}
-                              className={`w-full py-2 px-4 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium ${
-                                menu.is_free
-                                  ? 'bg-green-500 hover:bg-green-600 text-white'
-                                  : 'bg-accent-500 hover:bg-accent-600 text-white'
-                              }`}
-                            >
-                              {activationLoading === menu.id ? (
-                                <div className="flex items-center justify-center gap-2">
-                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                                  <span>Активация...</span>
-                                </div>
-                              ) : menu.is_free ? (
-                                'Активировать бесплатно'
-                              ) : (
-                                `Купить за ${menu.price} ₽`
-                              )}
-                            </button>
-
-                            {/* КНОПКА ПОДРОБНЕЕ ДЛЯ НЕАКТИВИРОВАННЫХ МЕНЮ */}
-                            <button
-                              onClick={() => navigate(`/premium-menus/${menu.id}`)}
-                              className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-4 rounded-lg transition-colors duration-200 text-sm font-medium"
-                            >
-                              Подробнее о меню
-                            </button>
-                          </>
+                        {/* Теги */}
+                        {menu.tags && menu.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mb-3">
+                            {menu.tags.slice(0, 3).map(tag => (
+                              <span
+                                key={tag.id}
+                                className="px-2 py-1 rounded-full text-xs text-white"
+                                style={{ backgroundColor: tag.color || '#6B7280' }}
+                              >
+                                {tag.name}
+                              </span>
+                            ))}
+                            {menu.tags.length > 3 && (
+                              <span className="px-2 py-1 rounded-full text-xs bg-gray-200 text-gray-600">
+                                +{menu.tags.length - 3}
+                              </span>
+                            )}
+                          </div>
                         )}
-                      </div>
-                    </div>
 
-                    {/* Ховер-эффект */}
-                    <div className="bg-primary-50 bg-opacity-0 group-hover:bg-opacity-100 transition-all duration-200 px-4 py-3 border-t border-gray-100">
-                      <div className="text-primary-600 text-sm font-medium">
-                        {menu.is_purchased ? 'Готово к использованию' : 'Доступно для активации'}
+                        {/* Информация о рецептах */}
+                        <div className="flex justify-between items-center text-sm text-gray-500 mb-4">
+                          <span>🍽️ {menu.recipes_count} рецептов</span>
+                          <span>{menu.premium_recipes.length} приемов пищи</span>
+                        </div>
+
+                        {/* Кнопки действий - ОБНОВЛЕННЫЕ С ROBOKASSA */}
+                        <div className="space-y-2">
+                          {!isAuthenticated ? (
+                            <>
+                              <button
+                                onClick={() => navigate(`/premium-menus/${menu.id}`)}
+                                className="w-full bg-primary-500 hover:bg-primary-600 text-white py-2 px-4 rounded-lg transition-colors duration-200 text-sm font-medium"
+                              >
+                                Подробнее
+                              </button>
+                              <div className="text-center">
+                                <span className="text-yellow-600 text-xs">⚠️ Требуется авторизация</span>
+                              </div>
+                            </>
+                          ) : isPaid ? (
+                            <>
+                              <button
+                                onClick={() => handleOpenCreatePlanModal(menu.id, menu.name, menu.duration_days)}
+                                disabled={isCurrentPlanCreation}
+                                className="w-full bg-primary-500 hover:bg-primary-600 text-white py-2 px-4 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                              >
+                                {isCurrentPlanCreation ? (
+                                  <div className="flex items-center justify-center gap-2">
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                    <span>Создание...</span>
+                                  </div>
+                                ) : (
+                                  'Создать план питания'
+                                )}
+                              </button>
+
+                              <button
+                                onClick={() => navigate(`/premium-menus/${menu.id}`)}
+                                className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-4 rounded-lg transition-colors duration-200 text-sm font-medium"
+                              >
+                                Подробнее о меню
+                              </button>
+
+                              <div className="text-center">
+                                <span className="text-green-600 text-xs">✓ Меню активировано</span>
+                              </div>
+                            </>
+                          ) : isProcessing ? (
+                            <>
+                              <button
+                                disabled
+                                className="w-full bg-yellow-500 text-white py-2 px-4 rounded-lg opacity-70 cursor-not-allowed text-sm font-medium"
+                              >
+                                Платеж в обработке
+                              </button>
+
+                              <button
+                                onClick={() => navigate(`/premium-menus/${menu.id}`)}
+                                className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-4 rounded-lg transition-colors duration-200 text-sm font-medium"
+                              >
+                                Подробнее о меню
+                              </button>
+
+                              <div className="text-center">
+                                <span className="text-yellow-600 text-xs">⏳ Ожидает подтверждения оплаты</span>
+                              </div>
+                            </>
+                          ) : menu.is_free ? (
+                            <>
+                              <button
+                                onClick={() => handleActivateMenu(menu.id)}
+                                disabled={isCurrentActivation}
+                                className="w-full bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                              >
+                                {isCurrentActivation ? (
+                                  <div className="flex items-center justify-center gap-2">
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                    <span>Активация...</span>
+                                  </div>
+                                ) : (
+                                  'Активировать бесплатно'
+                                )}
+                              </button>
+
+                              <button
+                                onClick={() => navigate(`/premium-menus/${menu.id}`)}
+                                className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-4 rounded-lg transition-colors duration-200 text-sm font-medium"
+                              >
+                                Подробнее о меню
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => handlePayment(menu.id)}
+                                disabled={isCurrentPayment}
+                                className="w-full bg-accent-500 hover:bg-accent-600 text-white py-2 px-4 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                              >
+                                {isCurrentPayment ? (
+                                  <div className="flex items-center justify-center gap-2">
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                    <span>Подготовка платежа...</span>
+                                  </div>
+                                ) : (
+                                  `Купить за ${menu.price} ₽`
+                                )}
+                              </button>
+
+                              <button
+                                onClick={() => navigate(`/premium-menus/${menu.id}`)}
+                                className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-4 rounded-lg transition-colors duration-200 text-sm font-medium"
+                              >
+                                Подробнее о меню
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Ховер-эффект */}
+                      <div className="bg-primary-50 bg-opacity-0 group-hover:bg-opacity-100 transition-all duration-200 px-4 py-3 border-t border-gray-100">
+                        <div className="text-primary-600 text-sm font-medium">
+                          {!isAuthenticated
+                            ? 'Доступно после авторизации'
+                            : isPaid
+                              ? 'Готово к использованию'
+                              : isProcessing
+                                ? 'Ожидает подтверждения оплаты'
+                                : 'Доступно для активации'
+                          }
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Кнопка загрузки дополнительных меню */}
@@ -578,16 +692,26 @@ const PremiumMenusPage: React.FC = () => {
             <li><strong>Разнообразие</strong> - меню для разных целей: похудение, поддержание веса, спорт, здоровое питание</li>
             <li><strong>Автоматизация</strong> - после активации меню автоматически создается план питания и список покупок</li>
             <li><strong>Гибкость</strong> - бесплатные и премиальные варианты на любой бюджет</li>
+            <li><strong>Безопасная оплата</strong> - все платежи защищены через Robokassa</li>
           </ul>
 
           <h3 className="text-lg font-semibold mt-6 mb-3">Как работают готовые меню:</h3>
           <ol className="list-decimal list-inside space-y-2 mb-4">
             <li>Выбираете подходящее меню из каталога</li>
-            <li>Активируете меню (бесплатно или за плату)</li>
+            <li>Активируете меню (бесплатно или через безопасную оплату)</li>
             <li>Создаете план питания на выбранную дату</li>
             <li>Получаете автоматически сгенерированный список покупок</li>
             <li>Наслаждаетесь вкусной и здоровой пищей всю неделю</li>
           </ol>
+
+          <h3 className="text-lg font-semibold mt-6 mb-3">Безопасность платежей:</h3>
+          <ul className="list-disc list-inside space-y-2 mb-4">
+            <li>Все платежи обрабатываются через защищенный шлюз Robokassa</li>
+            <li>Поддержка банковских карт и системы быстрых платежей (СБП)</li>
+            <li>Данные карт защищены по стандарту PCI DSS</li>
+            <li>Мгновенное подтверждение оплаты</li>
+            <li>Возможность возврата средств согласно законодательству</li>
+          </ul>
 
           <h3 className="text-lg font-semibold mt-6 mb-3">Категории меню:</h3>
           <ul className="list-disc list-inside space-y-2 mb-4">
@@ -603,6 +727,7 @@ const PremiumMenusPage: React.FC = () => {
               <strong>💡 Совет:</strong> Начните с бесплатных меню, чтобы оценить удобство системы.
               После активации меню автоматически появится в вашем календаре питания,
               а список покупок будет сгенерирован с учетом всех ингредиентов.
+              Для платных меню доступна безопасная оплата через Robokassa с поддержкой карт и СБП.
             </p>
           </div>
         </div>

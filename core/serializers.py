@@ -441,6 +441,7 @@ class PremiumMealPlanSerializer(serializers.ModelSerializer):
     tags = TagSerializer(many=True, read_only=True)
     premium_recipes = PremiumMealPlanRecipeSerializer(many=True, read_only=True)
     is_purchased = serializers.SerializerMethodField()
+    purchase_status = serializers.SerializerMethodField()  # Новое поле
     recipes_count = serializers.SerializerMethodField()
 
     class Meta:
@@ -456,6 +457,7 @@ class PremiumMealPlanSerializer(serializers.ModelSerializer):
             "tags",
             "premium_recipes",
             "is_purchased",
+            "purchase_status",  # Добавляем новое поле
             "recipes_count",
             "created_at",
         ]
@@ -463,10 +465,21 @@ class PremiumMealPlanSerializer(serializers.ModelSerializer):
     def get_is_purchased(self, obj):
         request = self.context.get("request")
         if request and request.user.is_authenticated:
-            return UserPurchase.objects.filter(
+            purchase = UserPurchase.objects.filter(
                 user=request.user, premium_meal_plan=obj
-            ).exists()
+            ).first()
+            return purchase and purchase.status == 'paid'
         return False
+
+    def get_purchase_status(self, obj):
+        """Возвращает статус покупки для текущего пользователя"""
+        request = self.context.get("request")
+        if request and request.user.is_authenticated:
+            purchase = UserPurchase.objects.filter(
+                user=request.user, premium_meal_plan=obj
+            ).first()
+            return purchase.status if purchase else None
+        return None
 
     def get_recipes_count(self, obj):
         return obj.premium_recipes.count()

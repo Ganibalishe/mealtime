@@ -128,6 +128,20 @@ class PremiumMealPlanStatusFilter(admin.SimpleListFilter):
         return queryset
 
 
+# НОВЫЙ ФИЛЬТР ДЛЯ СТАТУСОВ ПОКУПОК
+class UserPurchaseStatusFilter(admin.SimpleListFilter):
+    title = "Статус покупки"
+    parameter_name = "status"
+
+    def lookups(self, request, model_admin):
+        return UserPurchase.STATUS_CHOICES
+
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(status=self.value())
+        return queryset
+
+
 # Модель админки для ShoppingList
 @admin.register(ShoppingList)
 class ShoppingListAdmin(admin.ModelAdmin):
@@ -623,23 +637,30 @@ class PremiumMealPlanRecipeAdmin(admin.ModelAdmin):
     meal_type_display.short_description = "Прием пищи"
 
 
-# Модель админки для UserPurchase
+# ОБНОВЛЕННАЯ МОДЕЛЬ АДМИНКИ ДЛЯ USERPURCHASE
 @admin.register(UserPurchase)
 class UserPurchaseAdmin(admin.ModelAdmin):
     list_display = [
         "user",
         "premium_meal_plan",
         "price_paid_display",
+        "status",  # Добавляем реальное поле status в list_display
+        "status_display",  # И оставляем кастомное отображение
         "purchase_date",
     ]
-    list_filter = ["purchase_date", "premium_meal_plan"]
+    list_filter = [
+        UserPurchaseStatusFilter,  # Добавляем фильтр по статусу
+        "purchase_date",
+        "premium_meal_plan"
+    ]
     search_fields = [
         "user__username",
         "user__email",
         "premium_meal_plan__name",
     ]
     list_select_related = ["user", "premium_meal_plan"]
-    readonly_fields = ["purchase_date"]
+    readonly_fields = ["purchase_date", "id"]
+    list_editable = ["status"]  # Теперь status есть в list_display
     date_hierarchy = "purchase_date"
 
     def price_paid_display(self, obj):
@@ -649,6 +670,21 @@ class UserPurchaseAdmin(admin.ModelAdmin):
 
     price_paid_display.short_description = "Оплаченная сумма"
 
+    def status_display(self, obj):
+        status_colors = {
+            'paid': 'green',
+            'processing': 'orange',
+            'cancelled': 'red'
+        }
+        color = status_colors.get(obj.status, 'gray')
+        return format_html(
+            '<span style="color: {}; font-weight: bold;">{}</span>',
+            color,
+            obj.get_status_display()
+        )
+
+    status_display.short_description = "Статус (отображение)"
+
     fieldsets = (
         (
             "Основная информация",
@@ -657,14 +693,36 @@ class UserPurchaseAdmin(admin.ModelAdmin):
                     "user",
                     "premium_meal_plan",
                     "price_paid",
+                    "status",  # Добавляем поле статуса в форму редактирования
                 )
             },
         ),
         (
             "Системная информация",
             {
-                "fields": ("purchase_date",),
+                "fields": ("id", "purchase_date"),
                 "classes": ("collapse",),
             },
         ),
     )
+
+    # Действия для массового изменения статусов
+    def mark_as_paid(self, request, queryset):
+        updated = queryset.update(status='paid')
+        self.message_user(request, f"{updated} покупок отмечены как оплаченные")
+
+    mark_as_paid.short_description = "Отметить как оплаченные"
+
+    def mark_as_processing(self, request, queryset):
+        updated = queryset.update(status='processing')
+        self.message_user(request, f"{updated} покупок отмечены как в обработке")
+
+    mark_as_processing.short_description = "Отметить как в обработке"
+
+    def mark_as_cancelled(self, request, queryset):
+        updated = queryset.update(status='cancelled')
+        self.message_user(request, f"{updated} покупок отмечены как отмененные")
+
+    mark_as_cancelled.short_description = "Отметить как отмененные"
+
+    actions = [mark_as_paid, mark_as_processing, mark_as_cancelled]

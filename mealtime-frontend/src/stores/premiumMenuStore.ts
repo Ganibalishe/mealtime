@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import api from '../services/api';
-import type { PremiumMealPlan, PremiumMenuFilters } from '../types';
+import type { PremiumMealPlan, PremiumMenuFilters, PurchaseStatus } from '../types';
 
 interface PremiumMenuStore {
   // Состояние
@@ -119,6 +119,7 @@ export const usePremiumMenuStore = create<PremiumMenuStore>((set, get) => ({
       });
     }
   },
+
   updateCurrentMenu: (menuId: string, updates: Partial<PremiumMealPlan>) => {
     const { currentMenu } = get();
     if (currentMenu && currentMenu.id === menuId) {
@@ -127,26 +128,42 @@ export const usePremiumMenuStore = create<PremiumMenuStore>((set, get) => ({
       });
     }
   },
-  // Активация меню
+
+  // Активация меню - ИСПРАВЛЕННАЯ ВЕРСИЯ
   activateMenu: async (menuId: string) => {
     try {
       const response = await api.post(`/premium-meal-plans/${menuId}/activate/`);
       const { menus, filteredMenus, currentMenu } = get();
+
+      // Функция для создания обновленного меню с правильными типами
+      const createUpdatedMenu = (menu: PremiumMealPlan): PremiumMealPlan => {
+        const purchaseStatus: PurchaseStatus = menu.is_free ? 'paid' : 'processing';
+        return {
+          ...menu,
+          is_purchased: menu.is_free, // Для бесплатных сразу purchased=true
+          purchase_status: purchaseStatus
+        };
+      };
+
       const updatedMenus = menus.map(menu =>
-        menu.id === menuId ? { ...menu, is_purchased: true } : menu
+        menu.id === menuId ? createUpdatedMenu(menu) : menu
       );
+
       const updatedFilteredMenus = filteredMenus.map(menu =>
-        menu.id === menuId ? { ...menu, is_purchased: true } : menu
+        menu.id === menuId ? createUpdatedMenu(menu) : menu
       );
+
       set({
         menus: updatedMenus,
         filteredMenus: updatedFilteredMenus
       });
+
       if (currentMenu && currentMenu.id === menuId) {
         set({
-          currentMenu: { ...currentMenu, is_purchased: true }
+          currentMenu: createUpdatedMenu(currentMenu)
         });
       }
+
       return response.data;
     } catch (error: any) {
       throw new Error(error.response?.data?.error || 'Ошибка активации меню');

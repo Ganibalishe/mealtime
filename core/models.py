@@ -442,6 +442,12 @@ class TemplateItem(models.Model):
 
 
 class UserPurchase(models.Model):
+    STATUS_CHOICES = [
+        ('paid', 'Оплачен'),
+        ('processing', 'В обработке'),
+        ('cancelled', 'Отказ'),
+    ]
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(
         User, on_delete=models.CASCADE, verbose_name="Пользователь"
@@ -457,6 +463,12 @@ class UserPurchase(models.Model):
         blank=True,
         verbose_name="Оплаченная сумма",
     )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='processing',
+        verbose_name="Статус оплаты"
+    )
 
     class Meta:
         verbose_name = "Покупка пользователя"
@@ -465,4 +477,4 @@ class UserPurchase(models.Model):
         ordering = ["-purchase_date"]
 
     def __str__(self):
-        return f"{self.user.username} - {self.premium_meal_plan.name}"
+        return f"{self.user.username} - {self.premium_meal_plan.name} ({self.get_status_display()})"

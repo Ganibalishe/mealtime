@@ -2,6 +2,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from .api import *
+from .payments import *
 
 router = DefaultRouter()
 
@@ -32,4 +33,8 @@ urlpatterns = [
     path('api/premium-meal-plans/<uuid:pk>/create_meal_plan_from_date/',
          PremiumMealPlanViewSet.as_view({'post': 'create_meal_plan_from_date'}),
          name='premium-create-meal-plan-from-date'),
+    path('api/payments/create/', create_payment, name='create_payment'),
+    path('api/payments/result/', payment_result, name='payment_result'),
+    path('api/payments/success/', payment_success, name='payment_success'),
+    path('api/payments/fail/', payment_fail, name='payment_fail'),
 ]

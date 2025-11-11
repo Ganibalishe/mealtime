@@ -142,6 +142,12 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:5173",
 ]
 
+ROBOKASSA_MERCHANT_LOGIN = 'mealtimePlanner'  # Ваш логин в Robokassa
+ROBOKASSA_PASSWORD1 = 'kD09rOkuc7KJFb21UzRt'  # Пароль 1 для формирования подписи
+ROBOKASSA_PASSWORD2 = 'wFae9ADbZ75IjhAYP99H'  # Пароль 2 для проверки уведомлений
+ROBOKASSA_TEST_MODE = True  # Режим тестирования (True для разработки)
+ROBOKASSA_CURRENCY = 'RUB'
+
 # Логирование
 LOGGING = {
     "version": 1,

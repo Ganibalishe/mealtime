@@ -2,9 +2,11 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { usePremiumMenuStore } from '../stores/premiumMenuStore';
+import { usePaymentStore } from '../stores/paymentStore';
 import { useAuth } from '../hooks/useAuth';
 import SeoHead from '../components/SeoHead';
 import CreatePlanModal from '../components/CreatePlanModal';
+import { robokassaService } from '../services/robokassa';
 
 const PremiumMenuDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -20,6 +22,13 @@ const PremiumMenuDetailPage: React.FC = () => {
     activateMenu,
     createMealPlanFromDate
   } = usePremiumMenuStore();
+
+  const {
+    createPayment,
+    paymentLoading,
+    paymentError,
+    clearPaymentError
+  } = usePaymentStore();
 
   const [activationLoading, setActivationLoading] = useState(false);
 
@@ -46,11 +55,31 @@ const PremiumMenuDetailPage: React.FC = () => {
     try {
       await activateMenu(currentMenu.id);
       // Успешная активация - меню автоматически обновится в store
-      // Теперь currentMenu.is_purchased будет true
     } catch (error: any) {
       console.error('Ошибка активации меню:', error.message);
     } finally {
       setActivationLoading(false);
+    }
+  };
+
+  // Обработчик платежа через Robokassa
+  const handlePayment = async () => {
+    if (!currentMenu || !isAuthenticated) return;
+
+    clearPaymentError();
+
+    try {
+      // Загружаем скрипт Robokassa
+      await robokassaService.loadScript();
+
+      // Получаем параметры платежа с бэкенда
+      const paymentData = await createPayment(currentMenu.id);
+
+      // Запускаем платеж - теперь payment_params правильного типа
+      robokassaService.startPayment(paymentData.payment_params);
+
+    } catch (error: any) {
+      console.error('Ошибка при запуске платежа:', error.message);
     }
   };
 
@@ -116,6 +145,11 @@ const PremiumMenuDetailPage: React.FC = () => {
       </div>
     );
   }
+
+  // ОПРЕДЕЛЯЕМ СТАТУС ПОКУПКИ ДЛЯ ОТОБРАЖЕНИЯ ПРАВИЛЬНЫХ КНОПОК
+  const isPaid = currentMenu.is_purchased && currentMenu.purchase_status === 'paid';
+  const isProcessing = currentMenu.purchase_status === 'processing';
+  const isCancelled = currentMenu.purchase_status === 'cancelled';
 
   // Пример рецептов (первые 3)
   const exampleRecipes = currentMenu.premium_recipes.slice(0, 3);
@@ -221,7 +255,22 @@ const PremiumMenuDetailPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Кнопки действий */}
+                {/* Сообщение об ошибке платежа */}
+                {paymentError && (
+                  <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-3">
+                    <div className="text-red-700 text-sm text-center">
+                      {paymentError}
+                    </div>
+                    <button
+                      onClick={clearPaymentError}
+                      className="mt-2 text-red-600 hover:text-red-800 text-sm font-medium w-full text-center"
+                    >
+                      Закрыть
+                    </button>
+                  </div>
+                )}
+
+                {/* Кнопки действий - ОБНОВЛЕННАЯ ЛОГИКА С ROBOKASSA */}
                 {!isAuthenticated ? (
                   <div className="space-y-3">
                     <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
@@ -242,7 +291,8 @@ const PremiumMenuDetailPage: React.FC = () => {
                       Зарегистрироваться
                     </Link>
                   </div>
-                ) : currentMenu.is_purchased ? (
+                ) : isPaid ? (
+                  // Меню оплачено - можно создавать план
                   <button
                     onClick={handleOpenCreatePlanModal}
                     disabled={createPlanLoading}
@@ -257,34 +307,76 @@ const PremiumMenuDetailPage: React.FC = () => {
                       'Создать план питания'
                     )}
                   </button>
-                ) : (
+                ) : isProcessing ? (
+                  // Платеж в обработке - дизейблим кнопку
+                  <div className="space-y-3">
+                    <button
+                      disabled
+                      className="w-full bg-yellow-500 text-white py-3 px-4 rounded-lg opacity-70 cursor-not-allowed font-medium"
+                    >
+                      Платеж в обработке
+                    </button>
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                      <div className="text-yellow-700 text-xs text-center">
+                        ⏳ Ожидает подтверждения оплаты
+                      </div>
+                    </div>
+                  </div>
+                ) : currentMenu.is_free ? (
+                  // Бесплатное меню - активация
                   <button
                     onClick={handleActivateMenu}
                     disabled={activationLoading}
-                    className={`w-full py-3 px-4 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed font-medium ${
-                      currentMenu.is_free
-                        ? 'bg-green-500 hover:bg-green-600 text-white'
-                        : 'bg-accent-500 hover:bg-accent-600 text-white'
-                    }`}
+                    className="w-full bg-green-500 hover:bg-green-600 text-white py-3 px-4 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
                   >
                     {activationLoading ? (
                       <div className="flex items-center justify-center gap-2">
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                         <span>Активация...</span>
                       </div>
-                    ) : currentMenu.is_free ? (
+                    ) : (
                       'Активировать бесплатно'
+                    )}
+                  </button>
+                ) : (
+                  // Платное меню - оплата через Robokassa
+                  <button
+                    onClick={handlePayment}
+                    disabled={paymentLoading}
+                    className="w-full bg-accent-500 hover:bg-accent-600 text-white py-3 px-4 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                  >
+                    {paymentLoading ? (
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        <span>Подготовка платежа...</span>
+                      </div>
                     ) : (
                       `Купить за ${currentMenu.price} ₽`
                     )}
                   </button>
                 )}
 
-                {/* Статус меню */}
-                {isAuthenticated && currentMenu.is_purchased && (
+                {/* Статус меню - ОБНОВЛЕННЫЕ СООБЩЕНИЯ */}
+                {isAuthenticated && isPaid && (
                   <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-3">
                     <div className="text-green-700 text-sm text-center">
                       ✓ Меню активировано и готово к использованию
+                    </div>
+                  </div>
+                )}
+
+                {isAuthenticated && isProcessing && (
+                  <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                    <div className="text-yellow-700 text-sm text-center">
+                      ⏳ Ожидаем подтверждения платежа от платежной системы
+                    </div>
+                  </div>
+                )}
+
+                {isAuthenticated && isCancelled && (
+                  <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-3">
+                    <div className="text-red-700 text-sm text-center">
+                      ❌ Платеж был отменен. Попробуйте снова.
                     </div>
                   </div>
                 )}
@@ -304,6 +396,11 @@ const PremiumMenuDetailPage: React.FC = () => {
                     <div className="flex justify-between">
                       <span>✅ Поддержка 24/7</span>
                     </div>
+                    {!currentMenu.is_free && (
+                      <div className="flex justify-between">
+                        <span>🔒 Безопасная оплата через Robokassa</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -407,6 +504,18 @@ const PremiumMenuDetailPage: React.FC = () => {
               <li>Доступ к меню сохраняется навсегда</li>
             </ol>
 
+            {!currentMenu.is_free && (
+              <>
+                <h3 className="text-lg font-semibold mt-6 mb-3">Безопасная оплата:</h3>
+                <ul className="list-disc list-inside space-y-2 mb-4">
+                  <li>Оплата через защищенный шлюз Robokassa</li>
+                  <li>Поддержка банковских карт и СБП</li>
+                  <li>Все данные защищены по стандарту PCI DSS</li>
+                  <li>Мгновенное подтверждение оплаты</li>
+                </ul>
+              </>
+            )}
+
             <div className="bg-primary-50 p-4 rounded-lg mt-6">
               <p className="text-primary-800 text-sm">
                 <strong>💡 Совет:</strong> После активации меню вы можете использовать его многократно
@@ -416,7 +525,7 @@ const PremiumMenuDetailPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Навигация */}
+        {/* Навигация - ОБНОВЛЕННАЯ ЛОГИКА КНОПОК */}
         <div className="flex justify-between items-center mt-8 pt-8 border-t border-gray-200">
           <Link
             to="/premium-menus"
@@ -425,27 +534,43 @@ const PremiumMenuDetailPage: React.FC = () => {
             ← Вернуться к каталогу меню
           </Link>
 
-          {isAuthenticated && !currentMenu.is_purchased && (
+          {/* Правая кнопка в зависимости от статуса */}
+          {isAuthenticated && !isPaid && !isProcessing && currentMenu.is_free && (
             <button
               onClick={handleActivateMenu}
               disabled={activationLoading}
-              className={`py-2 px-6 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed font-medium ${
-                currentMenu.is_free
-                  ? 'bg-green-500 hover:bg-green-600 text-white'
-                  : 'bg-accent-500 hover:bg-accent-600 text-white'
-              }`}
+              className="bg-green-500 hover:bg-green-600 text-white py-2 px-6 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
             >
-              {activationLoading ? 'Активация...' : currentMenu.is_free ? 'Активировать бесплатно' : `Купить за ${currentMenu.price} ₽`}
+              {activationLoading ? 'Активация...' : 'Активировать бесплатно'}
             </button>
           )}
 
-          {isAuthenticated && currentMenu.is_purchased && (
+          {isAuthenticated && !isPaid && !isProcessing && !currentMenu.is_free && (
+            <button
+              onClick={handlePayment}
+              disabled={paymentLoading}
+              className="bg-accent-500 hover:bg-accent-600 text-white py-2 px-6 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+            >
+              {paymentLoading ? 'Подготовка...' : `Купить за ${currentMenu.price} ₽`}
+            </button>
+          )}
+
+          {isAuthenticated && isPaid && (
             <button
               onClick={handleOpenCreatePlanModal}
               disabled={createPlanLoading}
               className="bg-primary-500 hover:bg-primary-600 text-white py-2 px-6 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
             >
               {createPlanLoading ? 'Создание...' : 'Создать план питания'}
+            </button>
+          )}
+
+          {isAuthenticated && isProcessing && (
+            <button
+              disabled
+              className="bg-yellow-500 text-white py-2 px-6 rounded-lg opacity-70 cursor-not-allowed font-medium"
+            >
+              Платеж в обработке
             </button>
           )}
         </div>
