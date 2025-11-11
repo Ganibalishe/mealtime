@@ -146,7 +146,7 @@ CORS_ALLOWED_ORIGINS = [
 ROBOKASSA_MERCHANT_LOGIN = 'mealtimePlanner'  # Ваш логин (общий для теста и прода)
 
 # Тестовый режим
-ROBOKASSA_TEST_MODE = True  # Переключить на False для прода
+ROBOKASSA_TEST_MODE = False  # Переключить на False для прода
 
 # Тестовые пароли (для тестового режима)
 ROBOKASSA_TEST_PASSWORD1 = 'o5fv7jQtJHPGIR8kD98y'
