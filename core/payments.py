@@ -29,30 +29,29 @@ def get_robokassa_passwords():
 
 @csrf_exempt
 @api_view(['POST'])
-@permission_classes([AllowAny])  # ⬅️ ДОБАВЛЯЕМ ЭТУ СТРОЧКУ - разрешаем доступ без авторизации
+@permission_classes([AllowAny])
 def payment_result(request):
     """
     Обработка уведомления от Robokassa (ResultURL)
     """
-    # СОЗДАЕМ ДЕТАЛЬНЫЙ ЛОГ-ФАЙЛ
     log_lines = []
 
     def add_log(message):
         log_lines.append(message)
         logger.info(message)
-        print(f"ROBOKASSA_DEBUG: {message}")  # Дублируем в консоль
+        print(f"ROBOKASSA_DEBUG: {message}")
 
     try:
         add_log("=== НАЧАЛО ОБРАБОТКИ PAYMENT_RESULT ===")
         add_log("✅ Эндпоинт доступен без авторизации")
 
-        # Логируем ВСЕ входящие данные
+        # Логируем ВСЕ входящие данные (БЕЗ request.body - он вызывает ошибку)
         add_log(f"Метод запроса: {request.method}")
         add_log(f"Content-Type: {request.content_type}")
         add_log(f"Все заголовки: {dict(request.headers)}")
         add_log(f"Все POST параметры: {dict(request.POST)}")
         add_log(f"Все GET параметры: {dict(request.GET)}")
-        add_log(f"Тело запроса (raw): {request.body}")
+        # УБИРАЕМ СТРОКУ: add_log(f"Тело запроса (raw): {request.body}") - она вызывает ошибку
 
         # Проверяем, есть ли вообще данные
         if not request.POST:
