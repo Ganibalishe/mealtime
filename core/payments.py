@@ -28,35 +28,38 @@ def get_robokassa_passwords():
 
 
 @csrf_exempt
-@api_view(["POST"])
+@api_view(['POST'])
 def payment_result(request):
     """
     Обработка уведомления от Robokassa (ResultURL)
     """
     try:
         # Логируем входящий запрос для отладки
-        logger.info(f"Robokassa ResultURL request: {request.POST}")
+        logger.info(f"Robokassa ResultURL request: {dict(request.POST)}")
 
-        # Получаем параметры из запроса
-        out_sum = request.POST.get("OutSum", "").strip()
-        inv_id = request.POST.get("InvId", "").strip()
-        signature_value = request.POST.get("SignatureValue", "").strip().upper()
-        fee = request.POST.get("Fee", "0").strip()
-        email = request.POST.get("EMail", "").strip()
-        payment_method = request.POST.get("PaymentMethod", "").strip()
-        inc_curr_label = request.POST.get("IncCurrLabel", "").strip()
+        # ИСПРАВЛЕНИЕ: Получаем параметры с учетом дублирования (предпочитаем CamelCase)
+        out_sum = request.POST.get('OutSum') or request.POST.get('out_summ', '').strip()
+        inv_id = request.POST.get('InvId') or request.POST.get('inv_id', '').strip()
+        signature_value = request.POST.get('SignatureValue') or request.POST.get('crc', '').strip().upper()
+        fee = request.POST.get('Fee', '0').strip()
+        email = request.POST.get('EMail', '').strip()
+        payment_method = request.POST.get('PaymentMethod', '').strip()
+        inc_curr_label = request.POST.get('IncCurrLabel', '').strip()
+        is_test = request.POST.get('IsTest', '0').strip()
 
-        # ИСПРАВЛЕНО: ищем по order_number
+        logger.info(f"Parsed params - OutSum: {out_sum}, InvId: {inv_id}, Signature: {signature_value}, IsTest: {is_test}")
+
+        # ИСПРАВЛЕНИЕ: Преобразуем InvId в число
         try:
             inv_id_int = int(inv_id)
         except (TypeError, ValueError):
             logger.error(f"Invalid InvId format: {inv_id}")
-            return HttpResponse("ERROR: Invalid InvId format", status=400)
+            return HttpResponse('ERROR: Invalid InvId format', status=400)
 
         # Собираем пользовательские параметры (Shp_*)
         shp_params = {}
         for key, value in request.POST.items():
-            if key.startswith("Shp_"):
+            if key.startswith('Shp_'):
                 shp_params[key] = value.strip()
 
         # Сортируем пользовательские параметры по алфавиту
@@ -65,7 +68,8 @@ def payment_result(request):
         # Получаем пароль для проверки подписи
         password1, password2 = get_robokassa_passwords()
 
-        # Формируем базу для расчета контрольной суммы
+        # ИСПРАВЛЕНИЕ: Правильная база для расчета контрольной суммы
+        # Согласно документации: OutSum:InvId:Password2:Shp_param1=value1:Shp_param2=value2...
         signature_base = f"{out_sum}:{inv_id}:{password2}"
 
         # Добавляем пользовательские параметры если они есть
@@ -75,26 +79,24 @@ def payment_result(request):
         logger.info(f"Signature base: {signature_base}")
 
         # Рассчитываем ожидаемую подпись (MD5 в верхнем регистре)
-        expected_signature = (
-            hashlib.md5(signature_base.encode("utf-8")).hexdigest().upper()
-        )
+        expected_signature = hashlib.md5(signature_base.encode('utf-8')).hexdigest().upper()
 
         logger.info(f"Received signature: {signature_value}")
         logger.info(f"Expected signature: {expected_signature}")
+        logger.info(f"Using password2: {password2[:5]}...")  # Логируем только начало пароля
 
         # Проверяем подпись
         if signature_value != expected_signature:
-            logger.error(
-                f"Invalid signature for order #{inv_id}. Received: {signature_value}, Expected: {expected_signature}"
-            )
-            return HttpResponse("ERROR: Invalid signature", status=400)
+            logger.error(f"Invalid signature for order #{inv_id}. Received: {signature_value}, Expected: {expected_signature}")
+            logger.error(f"Signature base was: {signature_base}")
+            return HttpResponse('ERROR: Invalid signature', status=400)
 
         # Ищем покупку по order_number
         try:
             purchase = UserPurchase.objects.get(order_number=inv_id_int)
 
             # Проверяем сумму
-            expected_amount = str(purchase.price_paid) if purchase.price_paid else "0"
+            expected_amount = str(purchase.price_paid) if purchase.price_paid else '0'
 
             # Нормализуем суммы для сравнения
             try:
@@ -105,31 +107,30 @@ def payment_result(request):
                 expected_amount_normalized = expected_amount
 
             if received_amount_normalized != expected_amount_normalized:
-                logger.warning(
-                    f"Amount mismatch for order #{inv_id}. Received: {received_amount_normalized}, Expected: {expected_amount_normalized}"
-                )
-                if not settings.ROBOKASSA_TEST_MODE:
-                    return HttpResponse("ERROR: Amount mismatch", status=400)
+                logger.warning(f"Amount mismatch for order #{inv_id}. Received: {received_amount_normalized}, Expected: {expected_amount_normalized}")
+                # В тестовом режиме можем пропустить, в боевом - нужно проверять строго
+                if not settings.ROBOKASSA_TEST_MODE and is_test != '1':
+                    return HttpResponse('ERROR: Amount mismatch', status=400)
 
             # Обновляем статус покупки
-            purchase.status = "paid"
+            purchase.status = 'paid'
             purchase.save()
 
             logger.info(f"Order #{inv_id} successfully marked as paid")
 
             # Robokassa ожидает ответ в формате OK{InvId}
-            return HttpResponse(f"OK{inv_id}", content_type="text/plain")
+            return HttpResponse(f'OK{inv_id}', content_type='text/plain')
 
         except UserPurchase.DoesNotExist:
             logger.error(f"Order not found: #{inv_id}")
-            return HttpResponse("ERROR: Order not found", status=404)
+            return HttpResponse('ERROR: Order not found', status=404)
         except Exception as e:
             logger.error(f"Error processing order #{inv_id}: {str(e)}")
-            return HttpResponse(f"ERROR: {str(e)}", status=500)
+            return HttpResponse(f'ERROR: {str(e)}', status=500)
 
     except Exception as e:
         logger.error(f"Unexpected error in payment_result: {str(e)}")
-        return HttpResponse("ERROR: Internal server error", status=500)
+        return HttpResponse('ERROR: Internal server error', status=500)
 
 
 @api_view(["GET", "POST"])
