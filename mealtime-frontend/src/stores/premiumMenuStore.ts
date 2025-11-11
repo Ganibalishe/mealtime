@@ -135,33 +135,12 @@ export const usePremiumMenuStore = create<PremiumMenuStore>((set, get) => ({
       const response = await api.post(`/premium-meal-plans/${menuId}/activate/`);
       const { menus, filteredMenus, currentMenu } = get();
 
-      // Функция для создания обновленного меню с правильными типами
-      const createUpdatedMenu = (menu: PremiumMealPlan): PremiumMealPlan => {
-        const purchaseStatus: PurchaseStatus = menu.is_free ? 'paid' : 'processing';
-        return {
-          ...menu,
-          is_purchased: menu.is_free, // Для бесплатных сразу purchased=true
-          purchase_status: purchaseStatus
-        };
-      };
-
-      const updatedMenus = menus.map(menu =>
-        menu.id === menuId ? createUpdatedMenu(menu) : menu
-      );
-
-      const updatedFilteredMenus = filteredMenus.map(menu =>
-        menu.id === menuId ? createUpdatedMenu(menu) : menu
-      );
-
-      set({
-        menus: updatedMenus,
-        filteredMenus: updatedFilteredMenus
-      });
+      // ИСПРАВЛЕНИЕ: Обновляем статус без создания дубликатов в UI
+      // Просто перезагружаем данные, чтобы получить актуальное состояние
+      await get().loadMenus();
 
       if (currentMenu && currentMenu.id === menuId) {
-        set({
-          currentMenu: createUpdatedMenu(currentMenu)
-        });
+        await get().loadMenuById(menuId);
       }
 
       return response.data;

@@ -142,10 +142,24 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:5173",
 ]
 
-ROBOKASSA_MERCHANT_LOGIN = 'mealtimePlanner'  # Ваш логин в Robokassa
-ROBOKASSA_PASSWORD1 = 'kD09rOkuc7KJFb21UzRt'  # Пароль 1 для формирования подписи
-ROBOKASSA_PASSWORD2 = 'wFae9ADbZ75IjhAYP99H'  # Пароль 2 для проверки уведомлений
-ROBOKASSA_TEST_MODE = True  # Режим тестирования (True для разработки)
+# Робокасса - основные настройки
+ROBOKASSA_MERCHANT_LOGIN = 'mealtimePlanner'  # Ваш логин (общий для теста и прода)
+
+# Тестовый режим
+ROBOKASSA_TEST_MODE = True  # Переключить на False для прода
+
+# Тестовые пароли (для тестового режима)
+ROBOKASSA_TEST_PASSWORD1 = 'o5fv7jQtJHPGIR8kD98y'
+ROBOKASSA_TEST_PASSWORD2 = 'JBmF72Fa5W1VwlxvWo2i'
+
+# Продовые пароли (для боевого режима)
+ROBOKASSA_PASSWORD1 = 'kD09rOkuc7KJFb21UzRt'
+ROBOKASSA_PASSWORD2 = 'wFae9ADbZ75IjhAYP99H'
+
+# Автоматический выбор паролей в зависимости от режима
+ROBOKASSA_CURRENT_PASSWORD1 = ROBOKASSA_TEST_PASSWORD1 if ROBOKASSA_TEST_MODE else ROBOKASSA_PASSWORD1
+ROBOKASSA_CURRENT_PASSWORD2 = ROBOKASSA_TEST_PASSWORD2 if ROBOKASSA_TEST_MODE else ROBOKASSA_PASSWORD2
+
 ROBOKASSA_CURRENCY = 'RUB'
 
 # Логирование

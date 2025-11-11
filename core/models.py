@@ -449,6 +449,10 @@ class UserPurchase(models.Model):
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    order_number = models.PositiveIntegerField(
+        unique=True,
+        verbose_name="Номер заказа для платежной системы",
+    )
     user = models.ForeignKey(
         User, on_delete=models.CASCADE, verbose_name="Пользователь"
     )
@@ -473,8 +477,14 @@ class UserPurchase(models.Model):
     class Meta:
         verbose_name = "Покупка пользователя"
         verbose_name_plural = "Покупки пользователей"
-        unique_together = ["user", "premium_meal_plan"]  # Одна покупка на меню
+        # УБИРАЕМ unique_together чтобы разрешить multiple purchases
         ordering = ["-purchase_date"]
 
+    def save(self, *args, **kwargs):
+        if not self.order_number:
+            max_order = UserPurchase.objects.aggregate(models.Max('order_number'))['order_number__max']
+            self.order_number = (max_order or 0) + 1
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        return f"{self.user.username} - {self.premium_meal_plan.name} ({self.get_status_display()})"
+        return f"Заказ #{self.order_number} - {self.user.username} - {self.premium_meal_plan.name} ({self.get_status_display()})"

@@ -641,26 +641,28 @@ class PremiumMealPlanRecipeAdmin(admin.ModelAdmin):
 @admin.register(UserPurchase)
 class UserPurchaseAdmin(admin.ModelAdmin):
     list_display = [
+        "order_number",
         "user",
         "premium_meal_plan",
         "price_paid_display",
-        "status",  # Добавляем реальное поле status в list_display
+        "status",  # ✅ Добавляем реальное поле status в list_display
         "status_display",  # И оставляем кастомное отображение
         "purchase_date",
     ]
     list_filter = [
-        UserPurchaseStatusFilter,  # Добавляем фильтр по статусу
+        UserPurchaseStatusFilter,
         "purchase_date",
         "premium_meal_plan"
     ]
     search_fields = [
+        "order_number",
         "user__username",
         "user__email",
         "premium_meal_plan__name",
     ]
     list_select_related = ["user", "premium_meal_plan"]
-    readonly_fields = ["purchase_date", "id"]
-    list_editable = ["status"]  # Теперь status есть в list_display
+    readonly_fields = ["order_number", "purchase_date", "id"]
+    list_editable = ["status"]  # ✅ Теперь status есть в list_display
     date_hierarchy = "purchase_date"
 
     def price_paid_display(self, obj):
@@ -693,14 +695,14 @@ class UserPurchaseAdmin(admin.ModelAdmin):
                     "user",
                     "premium_meal_plan",
                     "price_paid",
-                    "status",  # Добавляем поле статуса в форму редактирования
+                    "status",
                 )
             },
         ),
         (
             "Системная информация",
             {
-                "fields": ("id", "purchase_date"),
+                "fields": ("id", "order_number", "purchase_date"),
                 "classes": ("collapse",),
             },
         ),

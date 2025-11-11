@@ -174,7 +174,8 @@ export interface User {
   }
 
   export interface UserPurchase {
-    id: string;
+    id: string; // ← UUID (остается строкой)
+    order_number: number; // ← новое поле
     user: string;
     premium_meal_plan: string | PremiumMealPlan;
     purchase_date: string;
@@ -285,22 +286,23 @@ export interface PaymentResponse {
 export interface RobokassaPaymentParams {
   MerchantLogin: string;
   OutSum: string;
-  InvId: string;
+  InvId: number; // ← order_number (число)
   Description: string;
   Culture: string;
   Encoding: string;
   IsTest: string;
   SignatureValue: string;
-  Settings: string; // JSON string
-  // Пользовательские параметры
+  Settings: string;
   Shp_user?: string;
   Shp_menu?: string;
-  [key: string]: any; // Для дополнительных параметров
+  Shp_purchase?: string; // ← UUID покупки
+  [key: string]: any;
 }
 
-// Ответ от сервера при создании платежа
 export interface CreatePaymentResponse {
   payment_params: RobokassaPaymentParams;
-  purchase_id: string;
+  purchase_id: string; // ← UUID (остается строкой)
+  order_number: number; // ← новое поле
   menu_name: string;
+  is_test: boolean;
 }
