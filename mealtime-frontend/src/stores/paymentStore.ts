@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import api from '../services/api';
-import type { CreatePaymentResponse, RobokassaPaymentParams } from '../types';
+import type { CreatePaymentResponse } from '../types';
 
 interface PaymentStore {
   // Состояние

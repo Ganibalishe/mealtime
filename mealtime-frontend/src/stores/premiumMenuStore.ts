@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import api from '../services/api';
-import type { PremiumMealPlan, PremiumMenuFilters, PurchaseStatus } from '../types';
+import type { PremiumMealPlan, PremiumMenuFilters } from '../types';
 
 interface PremiumMenuStore {
   // Состояние
@@ -133,7 +133,7 @@ export const usePremiumMenuStore = create<PremiumMenuStore>((set, get) => ({
   activateMenu: async (menuId: string) => {
     try {
       const response = await api.post(`/premium-meal-plans/${menuId}/activate/`);
-      const { menus, filteredMenus, currentMenu } = get();
+      const { currentMenu } = get();
 
       // ИСПРАВЛЕНИЕ: Обновляем статус без создания дубликатов в UI
       // Просто перезагружаем данные, чтобы получить актуальное состояние

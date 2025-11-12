@@ -121,6 +121,7 @@ def payment_result(request):
 
 
 @api_view(["GET", "POST"])
+@permission_classes([AllowAny])
 def payment_success(request):
     """
     Обработка успешного платежа (SuccessURL)
@@ -170,6 +171,7 @@ def payment_success(request):
 
 
 @api_view(["GET", "POST"])
+@permission_classes([AllowAny])
 def payment_fail(request):
     """
     Обработка неудачного платежа (FailURL)
