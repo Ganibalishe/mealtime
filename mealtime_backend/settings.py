@@ -165,6 +165,10 @@ ROBOKASSA_CURRENT_PASSWORD2 = (
 )
 
 ROBOKASSA_CURRENCY = "RUB"
+ROBOKASSA_PAYMENT_METHOD = 'full_payment'  # Способ расчета
+ROBOKASSA_PAYMENT_OBJECT = 'service'
+ROBOKASSA_TAX = 'none'
+ROBOKASSA_SNO = 'osn'
 
 # Логирование
 LOGGING = {

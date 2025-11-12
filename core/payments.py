@@ -2,6 +2,7 @@ import hashlib
 import uuid
 import json
 import time
+import urllib.parse
 from django.conf import settings
 from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -214,7 +215,7 @@ def payment_fail(request):
 @permission_classes([IsAuthenticated])
 def create_payment(request):
     """
-    Создание платежа в Robokassa
+    Создание платежа в Robokassa с фискализацией (чеком)
     """
     premium_meal_plan_id = request.data.get('premium_meal_plan_id')
 
@@ -223,7 +224,7 @@ def create_payment(request):
     except PremiumMealPlan.DoesNotExist:
         return Response({'error': 'Меню не найдено'}, status=404)
 
-    # ИСПРАВЛЕНИЕ: Проверяем, есть ли уже активная покупка (paid или processing)
+    # Проверяем, есть ли уже активная покупка (paid или processing)
     active_purchase = UserPurchase.objects.filter(
         user=request.user,
         premium_meal_plan=premium_meal_plan,
@@ -236,7 +237,7 @@ def create_payment(request):
         elif active_purchase.status == 'processing':
             return Response({'error': 'Платеж уже в обработке'}, status=400)
 
-    # ИСПРАВЛЕНИЕ: Всегда создаем новую покупку, даже если есть отмененные
+    # Создаем новую покупку
     purchase = UserPurchase.objects.create(
         user=request.user,
         premium_meal_plan=premium_meal_plan,
@@ -249,7 +250,7 @@ def create_payment(request):
 
     # Формируем параметры для Robokassa
     merchant_login = settings.ROBOKASSA_MERCHANT_LOGIN
-    out_sum = str(purchase.price_paid) if purchase.price_paid else '0'
+    out_sum = str(float(premium_meal_plan.price)) if premium_meal_plan.price else '0'
 
     if not settings.ROBOKASSA_TEST_MODE:
         try:
@@ -264,25 +265,56 @@ def create_payment(request):
     encoding = 'utf-8'
     is_test = '1' if settings.ROBOKASSA_TEST_MODE else '0'
 
+    # Формируем чек для фискализации
+    receipt_data = {
+        "sno": getattr(settings, 'ROBOKASSA_SNO', 'osn'),
+        "items": [
+            {
+                "name": premium_meal_plan.name[:128],
+                "quantity": 1,
+                "sum": float(out_sum),
+                "payment_method": getattr(settings, 'ROBOKASSA_PAYMENT_METHOD', 'full_payment'),
+                "payment_object": getattr(settings, 'ROBOKASSA_PAYMENT_OBJECT', 'service'),
+                "tax": getattr(settings, 'ROBOKASSA_TAX', 'vat20')
+            }
+        ]
+    }
+
+    # Преобразуем чек в JSON строку
+    receipt_json = json.dumps(receipt_data, ensure_ascii=False)
+
+    # URL-кодируем чек для включения в подпись
+    receipt_encoded = urllib.parse.quote(receipt_json, safe='')
+
+    # Пользовательские параметры
     shp_params = {
         'Shp_user': str(request.user.id),
         'Shp_menu': str(premium_meal_plan.id),
         'Shp_purchase': str(purchase.id),
     }
 
-    signature_base = f'{merchant_login}:{out_sum}:{inv_id}:{password1}'
+    # ВАЖНО: Формируем базу для подписи С УЧЕТОМ ЧЕКА
+    # Правильный формат: MerchantLogin:OutSum:InvId:Receipt:Password1:Shp_params...
+    signature_base = f'{merchant_login}:{out_sum}:{inv_id}:{receipt_encoded}:{password1}'
 
+    # Добавляем пользовательские параметры
     sorted_shp_params = sorted(shp_params.items())
     for key, value in sorted_shp_params:
         signature_base += f':{key}={value}'
 
+    logger.info(f"Signature base for order #{inv_id}: {signature_base.replace(password1, '***')}")
+
+    # Рассчитываем подпись
     signature_value = hashlib.md5(signature_base.encode(encoding)).hexdigest().lower()
 
+    # Настройки для iFrame
     settings_param = {
         'PaymentMethods': ['BankCard', 'SBP'],
         'Mode': 'modal'
     }
 
+    # Формируем параметры для передачи в Robokassa
+    # ВАЖНО: передаем Receipt в URL-кодированном виде
     payment_params = {
         'MerchantLogin': merchant_login,
         'OutSum': out_sum,
@@ -293,11 +325,14 @@ def create_payment(request):
         'IsTest': is_test,
         'SignatureValue': signature_value,
         'Settings': json.dumps(settings_param),
+        'Receipt': receipt_encoded,  # Передаем чек в URL-кодированном виде
     }
 
+    # Добавляем пользовательские параметры
     payment_params.update(shp_params)
 
-    logger.info(f"Created NEW payment for menu {premium_meal_plan.name}, Order: #{inv_id}, test mode: {settings.ROBOKASSA_TEST_MODE}")
+    logger.info(f"Created payment with receipt for menu {premium_meal_plan.name}, Order: #{inv_id}")
+    logger.info(f"Receipt data (encoded): {receipt_encoded}")
 
     return Response({
         'payment_params': payment_params,
