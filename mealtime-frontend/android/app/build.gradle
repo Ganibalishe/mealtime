@@ -1,0 +1,89 @@
+apply plugin: 'com.android.application'
+
+android {
+    namespace "com.mealtime.planner"
+    compileSdk rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId "com.mealtime.planner"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode 1
+        versionName "1.0"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        aaptOptions {
+             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
+             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
+            ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    signingConfigs {
+        release {
+            // Загружаем конфигурацию из keystore.properties если файл существует
+            def keystorePropertiesFile = rootProject.file("keystore.properties")
+            def keystoreProperties = new Properties()
+            if (keystorePropertiesFile.exists()) {
+                // Читаем файл с правильной кодировкой UTF-8
+                keystorePropertiesFile.withInputStream { stream ->
+                    keystoreProperties.load(new InputStreamReader(stream, "UTF-8"))
+                }
+                // Путь к keystore относительно корня проекта android
+                def keystorePath = keystoreProperties['storeFile']
+                def keystoreFile = file(rootProject.file(keystorePath))
+
+                // Проверяем, что файл существует
+                if (!keystoreFile.exists()) {
+                    throw new FileNotFoundException("Keystore file not found: ${keystoreFile.absolutePath}")
+                }
+
+                // Используем переменные окружения если они установлены, иначе из файла
+                def storePass = System.getenv("KEYSTORE_PASSWORD") ?: keystoreProperties['storePassword']
+                def keyPass = System.getenv("KEY_PASSWORD") ?: keystoreProperties['keyPassword'] ?: storePass
+
+                storeFile keystoreFile
+                storePassword storePass
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keyPass
+            }
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            // Используем signing config только если keystore.properties существует
+            def keystorePropertiesFile = rootProject.file("keystore.properties")
+            if (keystorePropertiesFile.exists()) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+}
+
+repositories {
+    flatDir{
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation project(':capacitor-android')
+    testImplementation "junit:junit:$junitVersion"
+    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    implementation project(':capacitor-cordova-android-plugins')
+}
+
+apply from: 'capacitor.build.gradle'
+
+try {
+    def servicesJSON = file('google-services.json')
+    if (servicesJSON.text) {
+        apply plugin: 'com.google.gms.google-services'
+    }
+} catch(Exception e) {
+    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}
