@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { Capacitor } from '@capacitor/core';
 import type {
   Recipe,
   MealPlan,
@@ -8,16 +9,52 @@ import type {
   Tag
 } from '../types';
 
+// Безопасно: для мобильных всегда используем продакшн, для веба - из env или localhost
+const getApiBaseUrl = () => {
+  if (Capacitor.isNativePlatform()) {
+    // Для мобильных приложений: всегда используем продакшн API
+    // Можно переопределить через VITE_API_URL если нужно
+    const envUrl = import.meta.env.VITE_API_URL;
+    if (envUrl) {
+      return envUrl;
+    }
 
+    // Продакшн API для мобильных приложений
+    return 'https://mealtime-planner.ru/api';
+  }
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+  // Веб: как раньше (localhost для разработки или из env)
+  return import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+};
+
+const API_BASE_URL = getApiBaseUrl();
+
+// Логируем URL для отладки (только в разработке)
+if (import.meta.env.DEV) {
+  console.log('🔗 API Base URL:', API_BASE_URL);
+  console.log('📱 Platform:', Capacitor.isNativePlatform() ? Capacitor.getPlatform() : 'web');
+}
 
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 30000, // 30 секунд таймаут
 });
+
+// Добавляем интерцептор для логирования запросов (только в разработке)
+if (import.meta.env.DEV) {
+  api.interceptors.request.use((config) => {
+    console.log('📤 API Request:', {
+      method: config.method?.toUpperCase(),
+      url: config.url,
+      fullURL: `${config.baseURL}${config.url}`,
+      baseURL: config.baseURL
+    });
+    return config;
+  });
+}
 
 // Функция для обновления токена
 const refreshAuthToken = async (): Promise<string> => {
@@ -57,6 +94,34 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
+    // Логируем ошибки для отладки
+    if (import.meta.env.DEV) {
+      const errorDetails = {
+        url: error.config?.url,
+        method: error.config?.method,
+        fullURL: error.config ? `${error.config.baseURL}${error.config.url}` : 'unknown',
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        message: error.message,
+        code: error.code,
+        data: error.response?.data,
+        baseURL: error.config?.baseURL,
+        timeout: error.code === 'ECONNABORTED' ? 'Request timeout' : null,
+        networkError: error.message === 'Network Error' ? 'Сервер недоступен. Проверьте:\n1. Django сервер запущен на 0.0.0.0:8000?\n2. Правильный IP адрес для устройства?\n3. Устройство в той же сети?' : null
+      };
+
+      console.error('❌ API Error:', errorDetails);
+
+      // Дополнительная информация для Network Error
+      if (error.message === 'Network Error' || error.code === 'ERR_NETWORK') {
+        console.error('🔴 Network Error Details:');
+        console.error('   - Проверьте, что Django сервер запущен: python manage.py runserver 0.0.0.0:8000');
+        console.error('   - Для эмулятора используйте: http://10.0.2.2:8000/api');
+        console.error('   - Для реального устройства используйте IP вашего компьютера');
+        console.error('   - Текущий API URL:', API_BASE_URL);
+      }
+    }
+
     const originalRequest = error.config;
 
     // ИСКЛЮЧАЕМ запросы аутентификации из логики обновления токена
@@ -74,7 +139,10 @@ api.interceptors.response.use(
         // Если обновление токена не удалось, очищаем токены но НЕ перенаправляем
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
-        window.dispatchEvent(new Event('authChange'));
+        // Безопасно: dispatchEvent только для веба
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('authChange'));
+        }
         return Promise.reject(refreshError);
       }
     }

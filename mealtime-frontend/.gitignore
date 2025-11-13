@@ -22,3 +22,13 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Capacitor / Mobile
+ios/App/Pods/
+ios/App/build/
+android/.gradle/
+android/app/build/
+android/.idea/
+android/local.properties
+*.jks
+*.keystore

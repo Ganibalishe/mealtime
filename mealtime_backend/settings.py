@@ -10,7 +10,15 @@ SECRET_KEY = "ваш-секретный-ключ-здесь"  # Замените
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["localhost", "127.0.0.1", "0.0.0.0", "mealtime-planner.ru"]
+ALLOWED_HOSTS = [
+    "localhost",
+    "127.0.0.1",
+    "0.0.0.0",
+    "mealtime-planner.ru",
+    "10.0.2.2",  # Android эмулятор (мапится на localhost хоста)
+    # Для реальных Android устройств добавьте IP вашего компьютера, например:
+    # "192.168.1.100",
+]
 
 # Application definition
 INSTALLED_APPS = [

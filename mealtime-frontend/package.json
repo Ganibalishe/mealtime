@@ -8,9 +8,16 @@
     "build": "vite build",
     "preview": "vite preview",
     "generate-sitemap": "node sitemap-generator.js",
-    "build-with-sitemap": "npm run generate-sitemap && npm run build"
+    "build-with-sitemap": "npm run generate-sitemap && npm run build",
+    "cap:sync": "npx cap sync",
+    "cap:copy": "npx cap copy",
+    "cap:ios": "npx cap open ios",
+    "cap:android": "npx cap open android",
+    "cap:build": "npm run build && npx cap sync"
   },
   "dependencies": {
+    "@capacitor/app": "^7.1.0",
+    "@capacitor/browser": "^7.0.2",
     "@headlessui/react": "^2.2.9",
     "@heroicons/react": "^2.2.0",
     "axios": "^1.12.2",
@@ -22,6 +29,10 @@
     "zustand": "^5.0.8"
   },
   "devDependencies": {
+    "@capacitor/android": "^7.4.4",
+    "@capacitor/cli": "^7.4.4",
+    "@capacitor/core": "^7.4.4",
+    "@capacitor/ios": "^7.4.4",
     "@eslint/js": "^9.36.0",
     "@types/react": "^19.1.13",
     "@types/react-dom": "^19.1.9",

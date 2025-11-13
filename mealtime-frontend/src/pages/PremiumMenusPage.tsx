@@ -33,6 +33,8 @@ const PremiumMenusPage: React.FC = () => {
     createPayment,
     paymentLoading,
     paymentError,
+    cancelPurchase,
+    cancelLoading,
     clearPaymentError
   } = usePaymentStore();
 
@@ -162,6 +164,27 @@ const PremiumMenusPage: React.FC = () => {
     } catch (error: any) {
       console.error('Ошибка при запуске платежа:', error.message);
     } finally {
+      setPaymentMenuId(null);
+    }
+  };
+
+  // Обработчик отмены покупки и повторной покупки
+  const handleCancelAndRetry = async (menuId: string) => {
+    setPaymentMenuId(menuId);
+    clearError();
+    clearPaymentError();
+
+    try {
+      // Отменяем текущую покупку
+      await cancelPurchase(menuId);
+
+      // Перезагружаем меню, чтобы обновить статус
+      await loadMenus();
+
+      // Сразу создаем новый платеж
+      await handlePayment(menuId);
+    } catch (error: any) {
+      console.error('Ошибка при отмене и повторной покупке:', error.message);
       setPaymentMenuId(null);
     }
   };
@@ -539,10 +562,18 @@ const PremiumMenusPage: React.FC = () => {
                           ) : isProcessing ? (
                             <>
                               <button
-                                disabled
-                                className="w-full bg-yellow-500 text-white py-2 px-4 rounded-lg opacity-70 cursor-not-allowed text-sm font-medium"
+                                onClick={() => handleCancelAndRetry(menu.id)}
+                                disabled={cancelLoading || (paymentMenuId === menu.id && paymentLoading)}
+                                className="w-full bg-orange-500 hover:bg-orange-600 text-white py-2 px-4 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
                               >
-                                Платеж в обработке
+                                {cancelLoading || (paymentMenuId === menu.id && paymentLoading) ? (
+                                  <div className="flex items-center justify-center gap-2">
+                                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                                    <span>Обработка...</span>
+                                  </div>
+                                ) : (
+                                  'Отменить и купить заново'
+                                )}
                               </button>
 
                               <button
@@ -553,7 +584,7 @@ const PremiumMenusPage: React.FC = () => {
                               </button>
 
                               <div className="text-center">
-                                <span className="text-yellow-600 text-xs">⏳ Ожидает подтверждения оплаты</span>
+                                <span className="text-yellow-600 text-xs">⏳ Платеж в обработке. Если вы не завершили оплату, нажмите кнопку выше</span>
                               </div>
                             </>
                           ) : menu.is_free ? (

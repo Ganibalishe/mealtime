@@ -12,6 +12,7 @@ import RecipesPage from './pages/RecipesPage';
 import { useAuth } from './hooks/useAuth';
 import PremiumMenusPage from './pages/PremiumMenusPage';
 import PremiumMenuDetailPage from './pages/PremiumMenuDetailPage';
+import { useBackButton } from './hooks/useBackButton';
 
 // Компонент для проверки авторизации с загрузкой
 const AuthWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -33,11 +34,13 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return <Layout>{children}</Layout>;
 };
 
-function App() {
+// Компонент-обертка для обработки кнопки "Назад" (должен быть внутри Router)
+const AppContent: React.FC = () => {
+  // Обработка системной кнопки "Назад" для мобильных
+  useBackButton();
+
   return (
-    <HelmetProvider>
-      <Router>
-        <Routes>
+    <Routes>
           {/* Публичные страницы - доступны без авторизации */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} /> {/* Добавляем регистрацию */}
@@ -61,7 +64,15 @@ function App() {
           } />
 
           <Route path="*" element={<Navigate to="/" />} />
-        </Routes>
+    </Routes>
+  );
+};
+
+function App() {
+  return (
+    <HelmetProvider>
+      <Router>
+        <AppContent />
       </Router>
     </HelmetProvider>
   );

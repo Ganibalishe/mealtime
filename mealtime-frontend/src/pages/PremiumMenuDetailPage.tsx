@@ -27,6 +27,8 @@ const PremiumMenuDetailPage: React.FC = () => {
     createPayment,
     paymentLoading,
     paymentError,
+    cancelPurchase,
+    cancelLoading,
     clearPaymentError
   } = usePaymentStore();
 
@@ -80,6 +82,26 @@ const PremiumMenuDetailPage: React.FC = () => {
 
     } catch (error: any) {
       console.error('Ошибка при запуске платежа:', error.message);
+    }
+  };
+
+  // Обработчик отмены покупки и повторной покупки
+  const handleCancelAndRetry = async () => {
+    if (!currentMenu || !isAuthenticated) return;
+
+    clearPaymentError();
+
+    try {
+      // Отменяем текущую покупку
+      await cancelPurchase(currentMenu.id);
+
+      // Перезагружаем меню, чтобы обновить статус
+      await loadMenuById(currentMenu.id);
+
+      // Сразу создаем новый платеж
+      await handlePayment();
+    } catch (error: any) {
+      console.error('Ошибка при отмене и повторной покупке:', error.message);
     }
   };
 
@@ -308,17 +330,25 @@ const PremiumMenuDetailPage: React.FC = () => {
                     )}
                   </button>
                 ) : isProcessing ? (
-                  // Платеж в обработке - дизейблим кнопку
+                  // Платеж в обработке - кнопка отмены и повторной покупки
                   <div className="space-y-3">
                     <button
-                      disabled
-                      className="w-full bg-yellow-500 text-white py-3 px-4 rounded-lg opacity-70 cursor-not-allowed font-medium"
+                      onClick={handleCancelAndRetry}
+                      disabled={cancelLoading || paymentLoading}
+                      className="w-full bg-orange-500 hover:bg-orange-600 text-white py-3 px-4 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
                     >
-                      Платеж в обработке
+                      {cancelLoading || paymentLoading ? (
+                        <div className="flex items-center justify-center gap-2">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          <span>Обработка...</span>
+                        </div>
+                      ) : (
+                        'Отменить и купить заново'
+                      )}
                     </button>
                     <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
                       <div className="text-yellow-700 text-xs text-center">
-                        ⏳ Ожидает подтверждения оплаты
+                        ⏳ Платеж в обработке. Если вы не завершили оплату, нажмите кнопку выше
                       </div>
                     </div>
                   </div>
@@ -567,10 +597,18 @@ const PremiumMenuDetailPage: React.FC = () => {
 
           {isAuthenticated && isProcessing && (
             <button
-              disabled
-              className="bg-yellow-500 text-white py-2 px-6 rounded-lg opacity-70 cursor-not-allowed font-medium"
+              onClick={handleCancelAndRetry}
+              disabled={cancelLoading || paymentLoading}
+              className="bg-orange-500 hover:bg-orange-600 text-white py-2 px-6 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
             >
-              Платеж в обработке
+              {cancelLoading || paymentLoading ? (
+                <div className="flex items-center justify-center gap-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  <span>Обработка...</span>
+                </div>
+              ) : (
+                'Отменить и купить заново'
+              )}
             </button>
           )}
         </div>

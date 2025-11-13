@@ -1,9 +1,10 @@
 // components/Layout.tsx - ОБНОВЛЕННАЯ ВЕРСИЯ С ИНФОРМАЦИЕЙ ДЛЯ ЭКВАЙРИНГА
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
 import { authService } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
+import { Capacitor } from '@capacitor/core';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -16,6 +17,19 @@ const Layout: React.FC<LayoutProps> = ({ children, variant = 'default' }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const isAuthenticated = useAuth();
+  const [bottomPadding, setBottomPadding] = useState<string>('0px');
+
+  // Определяем отступ снизу для мобильных устройств
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      // Для Android обычно navigation bar имеет высоту 48-56px
+      // Используем фиксированный отступ для надежности
+      setBottomPadding('56px'); // Стандартная высота navigation bar Android
+    } else {
+      // Для веба используем CSS переменные
+      setBottomPadding('env(safe-area-inset-bottom, 0px)');
+    }
+  }, []);
 
   const navigation = [
     { name: 'Календарь', href: '/', icon: '📅', mobileIcon: '📅' },
@@ -34,7 +48,9 @@ const Layout: React.FC<LayoutProps> = ({ children, variant = 'default' }) => {
 
   // Футер для auth страниц (более простой)
   const AuthFooter = () => (
-    <footer className="bg-white border-t border-gray-200 mt-auto">
+    <footer className="bg-white border-t border-gray-200 mt-auto" style={{
+      marginBottom: Capacitor.isNativePlatform() ? '56px' : '0px'
+    }}>
       <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
         <div className="text-center">
           <p className="text-gray-500 text-sm">
@@ -47,7 +63,9 @@ const Layout: React.FC<LayoutProps> = ({ children, variant = 'default' }) => {
 
   // Основной футер - ОБНОВЛЕН С ИНФОРМАЦИЕЙ ДЛЯ ЭКВАЙРИНГА
   const MainFooter = () => (
-    <footer className="bg-white border-t border-gray-200 mt-auto">
+    <footer className="bg-white border-t border-gray-200 mt-auto" style={{
+      marginBottom: Capacitor.isNativePlatform() ? '56px' : '0px'
+    }}>
       <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* О компании */}
@@ -181,7 +199,10 @@ const Layout: React.FC<LayoutProps> = ({ children, variant = 'default' }) => {
   );
 
   return (
-    <div className="min-h-screen flex flex-col bg-page">
+    <div className="min-h-screen flex flex-col bg-page" style={{
+      paddingBottom: bottomPadding,
+      minHeight: Capacitor.isNativePlatform() ? 'calc(100vh - 56px)' : '100vh'
+    }}>
       {/* Навигация с оригинальными цветами */}
       <nav className="bg-primary-500 shadow-sm border-b border-primary-600">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -314,7 +335,7 @@ const Layout: React.FC<LayoutProps> = ({ children, variant = 'default' }) => {
       </nav>
 
       {/* Основной контент */}
-      <main className={`flex-1 ${variant === 'default' ? 'py-6' : 'flex items-center justify-center py-12'}`}>
+      <main className={`flex-1 safe-content ${variant === 'default' ? 'py-6' : 'flex items-center justify-center py-12'}`}>
         {variant === 'default' ? (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="bg-white rounded-lg shadow-sm border border-neutral-200 p-4 sm:p-6 fade-in">

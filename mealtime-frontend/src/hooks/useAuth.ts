@@ -1,5 +1,6 @@
-// hooks/useAuth.ts - ОРИГИНАЛЬНАЯ ВЕРСИЯ
+// hooks/useAuth.ts
 import { useState, useEffect } from 'react';
+import { Capacitor } from '@capacitor/core';
 
 export const useAuth = () => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
@@ -12,13 +13,16 @@ export const useAuth = () => {
 
     checkAuth();
 
-    // Слушаем изменения в localStorage (на случай выхода из другого окна)
-    const handleStorageChange = () => {
-      checkAuth();
-    };
+    // Безопасно: слушаем изменения в localStorage только для веба
+    // В мобильных приложениях storage события не работают так же
+    if (!Capacitor.isNativePlatform() && typeof window !== 'undefined') {
+      const handleStorageChange = () => {
+        checkAuth();
+      };
 
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+      window.addEventListener('storage', handleStorageChange);
+      return () => window.removeEventListener('storage', handleStorageChange);
+    }
   }, []);
 
   return isAuthenticated;
