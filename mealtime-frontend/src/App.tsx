@@ -13,6 +13,7 @@ import { useAuth } from './hooks/useAuth';
 import PremiumMenusPage from './pages/PremiumMenusPage';
 import PremiumMenuDetailPage from './pages/PremiumMenuDetailPage';
 import { useBackButton } from './hooks/useBackButton';
+import ScrollToTop from './components/ScrollToTop';
 
 // Компонент для проверки авторизации с загрузкой
 const AuthWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -40,7 +41,10 @@ const AppContent: React.FC = () => {
   useBackButton();
 
   return (
-    <Routes>
+    <>
+      {/* Прокрутка страницы вверх при смене маршрута */}
+      <ScrollToTop />
+      <Routes>
           {/* Публичные страницы - доступны без авторизации */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} /> {/* Добавляем регистрацию */}
@@ -64,7 +68,8 @@ const AppContent: React.FC = () => {
           } />
 
           <Route path="*" element={<Navigate to="/" />} />
-    </Routes>
+      </Routes>
+    </>
   );
 };
 

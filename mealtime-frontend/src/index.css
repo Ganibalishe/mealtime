@@ -4,17 +4,22 @@
 
 /* Базовые стили */
 @layer base {
+  html {
+    /* Устанавливаем CSS переменную для safe area */
+    --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
   body {
     background-color: #FDFDFD;
     color: #1f1d1a;
     /* Отступ снизу для системных кнопок Android/iOS */
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-bottom: var(--safe-area-bottom);
   }
 
   /* Для мобильных устройств добавляем дополнительный отступ */
   @supports (padding: max(0px)) {
     body {
-      padding-bottom: max(env(safe-area-inset-bottom, 0px), 16px);
+      padding-bottom: max(var(--safe-area-bottom), 16px);
     }
   }
 }

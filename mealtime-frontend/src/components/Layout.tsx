@@ -5,6 +5,9 @@ import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
 import { authService } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import { Capacitor } from '@capacitor/core';
+import { useSafeArea } from '../hooks/useSafeArea';
+import BottomMenuBar from './BottomMenuBar';
+import BottomSheetMenu from './BottomSheetMenu';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -15,21 +18,10 @@ const Layout: React.FC<LayoutProps> = ({ children, variant = 'default' }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const isAuthenticated = useAuth();
-  const [bottomPadding, setBottomPadding] = useState<string>('0px');
-
-  // Определяем отступ снизу для мобильных устройств
-  useEffect(() => {
-    if (Capacitor.isNativePlatform()) {
-      // Для Android обычно navigation bar имеет высоту 48-56px
-      // Используем фиксированный отступ для надежности
-      setBottomPadding('56px'); // Стандартная высота navigation bar Android
-    } else {
-      // Для веба используем CSS переменные
-      setBottomPadding('env(safe-area-inset-bottom, 0px)');
-    }
-  }, []);
+  const bottomInset = useSafeArea();
 
   const navigation = [
     { name: 'Календарь', href: '/', icon: '📅', mobileIcon: '📅' },
@@ -46,10 +38,14 @@ const Layout: React.FC<LayoutProps> = ({ children, variant = 'default' }) => {
     window.location.reload();
   };
 
+  // Высота bottom menu bar (только для мобильных) - определяем здесь для использования в футерах
+  // Уменьшили высоту плашки: 48px (кнопка) + bottomInset (системные кнопки)
+  const bottomMenuHeight = Capacitor.isNativePlatform() ? 48 + bottomInset : 0;
+
   // Футер для auth страниц (более простой)
   const AuthFooter = () => (
     <footer className="bg-white border-t border-gray-200 mt-auto" style={{
-      marginBottom: Capacitor.isNativePlatform() ? '56px' : '0px'
+      marginBottom: Capacitor.isNativePlatform() ? `${bottomMenuHeight}px` : '0px'
     }}>
       <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
         <div className="text-center">
@@ -64,7 +60,7 @@ const Layout: React.FC<LayoutProps> = ({ children, variant = 'default' }) => {
   // Основной футер - ОБНОВЛЕН С ИНФОРМАЦИЕЙ ДЛЯ ЭКВАЙРИНГА
   const MainFooter = () => (
     <footer className="bg-white border-t border-gray-200 mt-auto" style={{
-      marginBottom: Capacitor.isNativePlatform() ? '56px' : '0px'
+      marginBottom: Capacitor.isNativePlatform() ? `${bottomMenuHeight}px` : '0px'
     }}>
       <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
@@ -199,10 +195,15 @@ const Layout: React.FC<LayoutProps> = ({ children, variant = 'default' }) => {
   );
 
   return (
-    <div className="min-h-screen flex flex-col bg-page" style={{
-      paddingBottom: bottomPadding,
-      minHeight: Capacitor.isNativePlatform() ? 'calc(100vh - 56px)' : '100vh'
-    }}>
+    <div
+      className="min-h-screen flex flex-col bg-page"
+      style={{
+        paddingBottom: Capacitor.isNativePlatform() ? `${bottomMenuHeight}px` : '0px',
+        minHeight: Capacitor.isNativePlatform()
+          ? `calc(100vh - ${bottomMenuHeight}px)`
+          : '100vh'
+      }}
+    >
       {/* Навигация с оригинальными цветами */}
       <nav className="bg-primary-500 shadow-sm border-b border-primary-600">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -261,23 +262,25 @@ const Layout: React.FC<LayoutProps> = ({ children, variant = 'default' }) => {
               )}
             </div>
 
-            {/* Кнопка мобильного меню */}
-            <div className="md:hidden flex items-center">
-              <button
-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="inline-flex items-center justify-center p-2 rounded-md text-primary-100 hover:text-white hover:bg-primary-600 focus:outline-none focus:ring-2 focus:ring-white"
-              >
-                {isMobileMenuOpen ? (
-                  <XMarkIcon className="block h-6 w-6" />
-                ) : (
-                  <Bars3Icon className="block h-6 w-6" />
-                )}
-              </button>
-            </div>
+            {/* Кнопка мобильного меню (скрыта на нативных платформах, т.к. есть bottom menu) */}
+            {!Capacitor.isNativePlatform() && (
+              <div className="md:hidden flex items-center">
+                <button
+                  onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                  className="inline-flex items-center justify-center p-2 rounded-md text-primary-100 hover:text-white hover:bg-primary-600 focus:outline-none focus:ring-2 focus:ring-white"
+                >
+                  {isMobileMenuOpen ? (
+                    <XMarkIcon className="block h-6 w-6" />
+                  ) : (
+                    <Bars3Icon className="block h-6 w-6" />
+                  )}
+                </button>
+              </div>
+            )}
           </div>
 
-          {/* Мобильное меню */}
-          {isMobileMenuOpen && (
+          {/* Мобильное меню (скрыто на нативных платформах) */}
+          {isMobileMenuOpen && !Capacitor.isNativePlatform() && (
             <div className="md:hidden bg-primary-600 border-t border-primary-500">
               <div className="px-2 pt-2 pb-3 space-y-1">
                 {navigation.map((item) => (
@@ -352,6 +355,20 @@ const Layout: React.FC<LayoutProps> = ({ children, variant = 'default' }) => {
 
       {/* Футер */}
       {variant === 'auth' ? <AuthFooter /> : <MainFooter />}
+
+      {/* Закрепленная плашка меню внизу (только для мобильных) */}
+      {Capacitor.isNativePlatform() && (
+        <>
+          <BottomMenuBar onMenuClick={() => setIsBottomSheetOpen(true)} />
+          <BottomSheetMenu
+            isOpen={isBottomSheetOpen}
+            onClose={() => setIsBottomSheetOpen(false)}
+            navigation={navigation}
+            isAuthenticated={isAuthenticated}
+            onLogout={handleLogout}
+          />
+        </>
+      )}
     </div>
   );
 };

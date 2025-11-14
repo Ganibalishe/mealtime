@@ -5,6 +5,9 @@ import { ru } from 'date-fns/locale';
 import { useRecipeStore } from '../stores/recipeStore';
 import type { Recipe } from '../types';
 import Portal from '../components/Portal';
+import { Capacitor } from '@capacitor/core';
+import { useSafeArea } from '../hooks/useSafeArea';
+import { modalManager } from '../utils/modalManager';
 
 interface RecipeModalProps {
   isOpen: boolean;
@@ -29,8 +32,12 @@ const RecipeModal: React.FC<RecipeModalProps> = ({
   const [maxCookingTime, setMaxCookingTime] = useState<number | ''>('');
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [scrollPosition, setScrollPosition] = useState(0);
+  const bottomInset = useSafeArea();
 
   const scrollableRef = useRef<HTMLDivElement>(null);
+
+  // Высота плашки меню для мобильных устройств
+  const bottomMenuHeight = Capacitor.isNativePlatform() ? 48 + bottomInset : 0;
 
   const {
     filteredRecipes,
@@ -218,6 +225,19 @@ const RecipeModal: React.FC<RecipeModalProps> = ({
     onClose();
   };
 
+  // Регистрация модального окна для обработки кнопки "Назад"
+  useEffect(() => {
+    if (isOpen) {
+      const modalId = modalManager.register(() => {
+        handleClose();
+      });
+      return () => {
+        modalManager.unregister(modalId);
+      };
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
   // Закрытие по ESC
   useEffect(() => {
     const handleEsc = (event: KeyboardEvent) => {
@@ -235,7 +255,7 @@ const RecipeModal: React.FC<RecipeModalProps> = ({
       document.removeEventListener('keydown', handleEsc);
       document.body.style.overflow = 'unset';
     };
-  }, [isOpen]);
+  }, [isOpen, handleClose]);
 
   if (!isOpen) return null;
 
@@ -390,7 +410,12 @@ const RecipeModal: React.FC<RecipeModalProps> = ({
                     </div>
 
                     {/* Кнопки действий */}
-                    <div className="space-y-3 sm:space-y-0 sm:flex sm:space-x-3">
+                    <div
+                      className="space-y-3 sm:space-y-0 sm:flex sm:space-x-3"
+                      style={{
+                        paddingBottom: Capacitor.isNativePlatform() ? `${bottomMenuHeight}px` : '0px'
+                      }}
+                    >
                       <button
                         onClick={handleBackToList}
                         className="btn-outline w-full sm:flex-1 py-3 text-sm sm:text-base mobile-touch-target"

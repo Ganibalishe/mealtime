@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
+import { modalManager } from '../utils/modalManager';
 
 export const useBackButton = () => {
   const navigate = useNavigate();
@@ -16,6 +17,13 @@ export const useBackButton = () => {
 
     // Обработчик hardware back button
     const backButtonHandler = App.addListener('backButton', () => {
+      // Сначала проверяем, есть ли открытые модальные окна
+      if (modalManager.hasOpenModals()) {
+        // Закрываем последнее открытое модальное окно
+        modalManager.closeTopModal();
+        return;
+      }
+
       // Главные страницы, с которых можно закрыть приложение
       const exitPages = ['/', '/login', '/register'];
       const isOnExitPage = exitPages.includes(location.pathname);

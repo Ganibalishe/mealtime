@@ -1,86 +1,137 @@
-# management/commands/load_new_recipes.py
 import json
 import os
 from django.core.management.base import BaseCommand
 from django.db import transaction
-from django.core.files.base import ContentFile
 from core.models import (
     Ingredient, IngredientCategory, CookingMethod, Tag,
     Recipe, RecipeIngredient
 )
 
 class Command(BaseCommand):
-    help = 'Загружает новые рецепты из JSON файла в базу данных'
+    help = 'Load new premium recipes from JSON file'
 
     def add_arguments(self, parser):
         parser.add_argument(
             '--file',
             type=str,
-            default='recipes.json',
-            help='Путь к JSON файлу с рецептами'
+            default='ann_recipes.json',
+            help='JSON file with recipes data'
         )
 
     def handle(self, *args, **options):
         file_path = options['file']
 
-        # Загружаем все существующие данные
-        existing_ingredients = {ing.name.lower(): ing for ing in Ingredient.objects.all()}
-        existing_categories = {cat.name: cat for cat in IngredientCategory.objects.all()}
-        existing_cooking_methods = {method.name: method for method in CookingMethod.objects.all()}
-        existing_tags = {tag.name: tag for tag in Tag.objects.all()}
+        if not os.path.exists(file_path):
+            self.stdout.write(
+                self.style.ERROR(f'File {file_path} does not exist')
+            )
+            return
 
-        # Читаем JSON файл
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 recipes_data = json.load(f)
-        except FileNotFoundError:
-            self.stdout.write(self.style.ERROR(f'Файл {file_path} не найден'))
-            return
-        except json.JSONDecodeError as e:
-            self.stdout.write(self.style.ERROR(f'Ошибка чтения JSON: {e}'))
+        except Exception as e:
+            self.stdout.write(
+                self.style.ERROR(f'Error reading JSON file: {e}')
+            )
             return
 
-        success_count = 0
-        error_count = 0
+        # Load existing data into memory
+        ingredients = {ing.name.lower(): ing for ing in Ingredient.objects.all()}
+        categories = {cat.name: cat for cat in IngredientCategory.objects.all()}
+        cooking_methods = {cm.name.lower(): cm for cm in CookingMethod.objects.all()}
+        tags = {tag.name.lower(): tag for tag in Tag.objects.all()}
 
-        with transaction.atomic():
-            for recipe_data in recipes_data:
-                try:
-                    self.create_recipe(
-                        recipe_data,
-                        existing_ingredients,
-                        existing_categories,
-                        existing_cooking_methods,
-                        existing_tags
-                    )
-                    success_count += 1
-                    self.stdout.write(
-                        self.style.SUCCESS(f'Рецепт "{recipe_data["name"]}" создан')
-                    )
-                except Exception as e:
-                    error_count += 1
-                    self.stdout.write(
-                        self.style.ERROR(f'Ошибка создания рецепта "{recipe_data["name"]}": {e}')
-                    )
+        created_recipes_count = 0
+        created_ingredients_count = 0
+        created_tags_count = 0
+        created_methods_count = 0
+        errors = []
 
         self.stdout.write(
-            self.style.SUCCESS(
-                f'Загрузка завершена: {success_count} успешно, {error_count} с ошибками'
-            )
+            self.style.SUCCESS(f'Starting to process {len(recipes_data)} recipes...')
         )
 
-    def create_recipe(self, recipe_data, existing_ingredients, existing_categories,
-                     existing_cooking_methods, existing_tags):
-        """Создает один рецепт со всеми связями"""
+        with transaction.atomic():
+            for i, recipe_data in enumerate(recipes_data, 1):
+                try:
+                    recipe_created, ing_created, tag_created, method_created = self.create_recipe(
+                        recipe_data,
+                        ingredients,
+                        categories,
+                        cooking_methods,
+                        tags
+                    )
 
-        # Находим или создаем способ приготовления
+                    if recipe_created:
+                        created_recipes_count += 1
+                    created_ingredients_count += ing_created
+                    created_tags_count += tag_created
+                    created_methods_count += method_created
+
+                    self.stdout.write(
+                        self.style.SUCCESS(f'✅ Processed {i}/{len(recipes_data)}: {recipe_data["name"]}')
+                    )
+
+                except Exception as e:
+                    error_msg = f"{recipe_data['name']}: {str(e)}"
+                    errors.append(error_msg)
+                    self.stdout.write(
+                        self.style.ERROR(f'❌ Failed {i}/{len(recipes_data)}: {error_msg}')
+                    )
+
+        # Summary
+        self.stdout.write(
+            self.style.SUCCESS('\n' + '='*50)
+        )
+        self.stdout.write(
+            self.style.SUCCESS('📊 LOADING SUMMARY:')
+        )
+        self.stdout.write(
+            self.style.SUCCESS(f'✅ Recipes created: {created_recipes_count}')
+        )
+        self.stdout.write(
+            self.style.SUCCESS(f'✅ New ingredients created: {created_ingredients_count}')
+        )
+        self.stdout.write(
+            self.style.SUCCESS(f'✅ New tags created: {created_tags_count}')
+        )
+        self.stdout.write(
+            self.style.SUCCESS(f'✅ New cooking methods created: {created_methods_count}')
+        )
+
+        if errors:
+            self.stdout.write(
+                self.style.WARNING(f'\n⚠️  Errors occurred ({len(errors)}):')
+            )
+            for error in errors:
+                self.stdout.write(self.style.ERROR(f'  • {error}'))
+        else:
+            self.stdout.write(
+                self.style.SUCCESS('\n🎉 All recipes processed successfully!')
+            )
+
+    def create_recipe(self, recipe_data, ingredients, categories, cooking_methods, tags):
+        ingredient_created_count = 0
+        tag_created_count = 0
+        method_created_count = 0
+
+        # Get or create cooking method
         cooking_method_name = recipe_data['cooking_method']
-        cooking_method = existing_cooking_methods.get(cooking_method_name)
-        if not cooking_method:
-            cooking_method = CookingMethod.objects.create(name=cooking_method_name)
-            existing_cooking_methods[cooking_method_name] = cooking_method
+        cooking_method_lower = cooking_method_name.lower()
 
-        # Создаем рецепт
+        cooking_method = cooking_methods.get(cooking_method_lower)
+        if not cooking_method:
+            cooking_method = CookingMethod.objects.create(
+                name=cooking_method_name
+            )
+            cooking_methods[cooking_method_lower] = cooking_method
+            method_created_count += 1
+            self.stdout.write(
+                self.style.WARNING(f'   Created new cooking method: {cooking_method_name}')
+            )
+
+        # Create recipe
         recipe = Recipe.objects.create(
             name=recipe_data['name'],
             description=recipe_data['description'],
@@ -89,155 +140,180 @@ class Command(BaseCommand):
             cooking_method=cooking_method,
             instructions=recipe_data['instructions'],
             portions=recipe_data['portions'],
-            is_premium=False
+            is_premium=True  # Set premium flag as requested
         )
 
-        # Добавляем теги
+        # Add tags
+        recipe_tags = []
         for tag_name in recipe_data['tags']:
-            tag = existing_tags.get(tag_name)
+            tag_lower = tag_name.lower()
+            tag = tags.get(tag_lower)
             if not tag:
-                # Создаем новый тег с цветом по умолчанию
                 tag = Tag.objects.create(
                     name=tag_name,
-                    color='#808080',
-                    description=f'Автоматически созданный тег для {tag_name}'
+                    color=self.get_default_tag_color(tag_name),
+                    description=f"Автоматически созданный тег для {tag_name}"
                 )
-                existing_tags[tag_name] = tag
-            recipe.tags.add(tag)
+                tags[tag_lower] = tag
+                tag_created_count += 1
+                self.stdout.write(
+                    self.style.WARNING(f'   Created new tag: {tag_name}')
+                )
+            recipe_tags.append(tag)
 
-        # Добавляем ингредиенты
+        recipe.tags.set(recipe_tags)
+
+        # Create recipe ingredients
         for ing_data in recipe_data['ingredients']:
             ingredient_name = ing_data['name']
+            ingredient_name_lower = ingredient_name.lower()
             quantity = ing_data['quantity']
 
-            # Ищем существующий ингредиент
-            ingredient = existing_ingredients.get(ingredient_name.lower())
+            ingredient = ingredients.get(ingredient_name_lower)
 
             if not ingredient:
-                # Создаем новый ингредиент
-                ingredient = self.create_new_ingredient(ingredient_name, existing_categories)
-                existing_ingredients[ingredient_name.lower()] = ingredient
+                # Create new ingredient with appropriate category and unit
+                category, unit = self.determine_category_and_unit(ingredient_name, categories)
+                ingredient = Ingredient.objects.create(
+                    name=ingredient_name,
+                    category=category,
+                    default_unit=unit
+                )
+                ingredients[ingredient_name_lower] = ingredient
+                ingredient_created_count += 1
+                self.stdout.write(
+                    self.style.WARNING(f'   Created new ingredient: {ingredient_name} ({unit})')
+                )
 
-            # Создаем связь рецепт-ингредиент
             RecipeIngredient.objects.create(
                 recipe=recipe,
                 ingredient=ingredient,
                 quantity=quantity
             )
 
-        return recipe
+        return True, ingredient_created_count, tag_created_count, method_created_count
 
-    def create_new_ingredient(self, ingredient_name, existing_categories):
-        """Создает новый ингредиент с автоматическим определением категории и единицы измерения"""
-
-        # Определяем категорию по логике
-        category_name = self.determine_category(ingredient_name)
-        category = existing_categories.get(category_name)
-
-        if not category:
-            # Создаем новую категорию если не найдена
-            category = IngredientCategory.objects.create(
-                name=category_name,
-                order=99
-            )
-            existing_categories[category_name] = category
-
-        # Определяем единицу измерения
-        default_unit = self.determine_unit(ingredient_name, category_name)
-
-        # Создаем ингредиент
-        ingredient = Ingredient.objects.create(
-            name=ingredient_name,
-            category=category,
-            default_unit=default_unit
-        )
-
-        self.stdout.write(
-            self.style.WARNING(f'Создан новый ингредиент: {ingredient_name}')
-        )
-
-        return ingredient
-
-    def determine_category(self, ingredient_name):
-        """Определяет категорию ингредиента по его названию"""
-        vegetable_keywords = ['помидор', 'огурец', 'картофель', 'морковь', 'лук', 'капуста',
-                             'перец', 'баклажан', 'кабачок', 'тыква', 'свекла', 'редис', 'салат',
-                             'редис', 'редиска', 'редис', 'редиска', 'редис', 'редиска']
-        fruit_keywords = ['яблоко', 'апельсин', 'банан', 'лимон', 'груша', 'персик', 'абрикос',
-                         'виноград', 'клубника', 'малина', 'черника', 'ежевика', 'арбуз', 'дыня']
-        meat_keywords = ['куриц', 'говядин', 'свинин', 'баранин', 'телятин', 'индейк', 'утк',
-                        'гус', 'кролик', 'оленин', 'стейк', 'фарш', 'грудинк', 'бедр', 'крылышк']
-        fish_keywords = ['лосось', 'семга', 'форель', 'треск', 'окунь', 'щук', 'карп', 'сом',
-                        'креветк', 'кальмар', 'миди', 'устриц', 'икра', 'краб', 'омары']
-        dairy_keywords = ['молоко', 'сыр', 'творог', 'сметан', 'йогурт', 'кефир', 'простокваш',
-                         'ряженк', 'сливки', 'масло сливочн', 'маргарин']
+    def determine_category_and_unit(self, ingredient_name, categories):
+        """
+        Determine appropriate category and unit for new ingredients
+        based on ingredient name and doctor's recommendations
+        """
+        # Default values
+        category_name = "Прочее"
+        unit = "g"
 
         ingredient_lower = ingredient_name.lower()
 
-        if any(keyword in ingredient_lower for keyword in vegetable_keywords):
-            return 'Овощи и зелень'
-        elif any(keyword in ingredient_lower for keyword in fruit_keywords):
-            return 'Фрукты и ягоды'
-        elif any(keyword in ingredient_lower for keyword in meat_keywords):
-            return 'Мясо и птица'
-        elif any(keyword in ingredient_lower for keyword in fish_keywords):
-            return 'Рыба и морепродукты'
-        elif any(keyword in ingredient_lower for keyword in dairy_keywords):
-            return 'Молочные продукты'
-        elif 'яйц' in ingredient_lower:
-            return 'Яйца'
-        elif 'круп' in ingredient_lower or 'макарон' in ingredient_lower or 'рис' in ingredient_lower:
-            return 'Крупы и макароны'
-        elif 'мук' in ingredient_lower:
-            return 'Мука и смеси'
-        elif 'масл' in ingredient_lower:
-            return 'Масла и жиры'
-        elif 'специ' in ingredient_lower or 'трав' in ingredient_lower:
-            return 'Специи и травы'
-        elif 'орех' in ingredient_lower or 'семечк' in ingredient_lower:
-            return 'Орехи и сухофрукты'
-        else:
-            return 'Прочее'
+        # Vegetable detection
+        veg_keywords = ['помидор', 'огурец', 'перец', 'капуста', 'морковь',
+                       'лук', 'кабачок', 'брокколи', 'шпинат', 'салат', 'цуккини']
+        # Fruit detection
+        fruit_keywords = ['яблоко', 'банан', 'апельсин', 'лимон', 'лайм',
+                         'ягода', 'малина', 'клубника', 'черника', 'авокадо',
+                         'груша', 'киви', 'персик']
+        # Protein detection
+        protein_keywords = ['куриц', 'грудк', 'филе', 'говядин', 'треск',
+                           'тунец', 'творог', 'йогурт', 'кефир', 'сыр', 'индейк']
+        # Grain detection
+        grain_keywords = ['гречк', 'овсян', 'булгур', 'рис', 'макарон', 'хлопья']
+        # Nut detection
+        nut_keywords = ['орех', 'миндаль', 'грецкий', 'кедровый', 'семена', 'курага']
+        # Dairy detection
+        dairy_keywords = ['молоко', 'йогурт', 'кефир', 'творог', 'сметана']
+        # Oil detection
+        oil_keywords = ['масло', 'оливков', 'миндальн']
+        # Sweet detection
+        sweet_keywords = ['мед', 'сироп']
+        # Bread detection
+        bread_keywords = ['хлеб', 'тост']
 
-    def determine_unit(self, ingredient_name, category_name):
-        """Определяет единицу измерения для ингредиента"""
-        ingredient_lower = ingredient_name.lower()
-
-        # Овощи и фрукты обычно в кг
-        if category_name in ['Овощи и зелень', 'Фрукты и ягоды']:
-            return 'kg'
-
-        # Мясо, рыба, сыры - в граммах
-        elif category_name in ['Мясо и птица', 'Рыба и морепродукты', 'Сыры']:
-            return 'g'
-
-        # Жидкие молочные продукты - в мл
-        elif category_name == 'Молочные продукты' and any(word in ingredient_lower for word in ['молоко', 'кефир', 'сливки']):
-            return 'ml'
-
-        # Яйца - штуки
-        elif category_name == 'Яйца':
-            return 'pcs'
-
-        # Крупы, мука, сахар - в граммах
-        elif category_name in ['Крупы и макароны', 'Мука и смеси']:
-            return 'g'
-
-        # Масла - мл для жидкостей, г для твердых
-        elif category_name == 'Масла и жиры':
-            if any(word in ingredient_lower for word in ['масло растительное', 'оливковое', 'кунжутное']):
-                return 'ml'
+        if any(keyword in ingredient_lower for keyword in veg_keywords):
+            category_name = "Овощи и зелень"
+            if any(word in ingredient_lower for word in ['помидор', 'капуста', 'лук', 'морковь']):
+                unit = "kg"
             else:
-                return 'g'
+                unit = "g"
 
-        # Соусы - мл для жидкостей
-        elif category_name == 'Соусы и приправы':
-            return 'ml' if any(word in ingredient_lower for word in ['соус', 'уксус']) else 'g'
+        elif any(keyword in ingredient_lower for keyword in fruit_keywords):
+            category_name = "Фрукты и ягоды"
+            if any(word in ingredient_lower for word in ['яблоко', 'банан', 'апельсин', 'лимон', 'груша', 'персик']):
+                unit = "kg"
+            else:
+                unit = "g"
 
-        # Специи - граммы
-        elif category_name == 'Специи и травы':
-            return 'g'
+        elif any(keyword in ingredient_lower for keyword in protein_keywords):
+            if any(word in ingredient_lower for word in ['куриц', 'говядин', 'филе', 'индейк']):
+                category_name = "Мясо и птица"
+            elif any(word in ingredient_lower for word in ['треск', 'тунец']):
+                category_name = "Рыба и морепродукты"
+            elif any(word in ingredient_lower for word in dairy_keywords):
+                category_name = "Молочные продукты"
+            unit = "g"
 
-        # По умолчанию - граммы
-        else:
-            return 'g'
+        elif any(keyword in ingredient_lower for keyword in grain_keywords):
+            category_name = "Крупы и макароны"
+            unit = "g"
+
+        elif any(keyword in ingredient_lower for keyword in nut_keywords):
+            category_name = "Орехи и сухофрукты"
+            unit = "g"
+
+        elif any(keyword in ingredient_lower for keyword in oil_keywords):
+            category_name = "Масла и жиры"
+            unit = "ml" if 'масло' in ingredient_lower else "g"
+
+        elif any(keyword in ingredient_lower for keyword in sweet_keywords):
+            category_name = "Сладости"
+            unit = "g"
+
+        elif any(keyword in ingredient_lower for keyword in bread_keywords):
+            category_name = "Хлеб и выпечка"
+            unit = "pcs"
+
+        elif 'бульон' in ingredient_lower:
+            category_name = "Бакалея"
+            unit = "ml"
+
+        elif 'уксус' in ingredient_lower:
+            category_name = "Соусы и приправы"
+            unit = "ml"
+
+        elif any(word in ingredient_lower for word in ['корица', 'травы', 'перец']):
+            category_name = "Специи и травы"
+            unit = "g"
+
+        category = categories.get(category_name)
+        if not category:
+            # If category doesn't exist, use "Прочее"
+            category = categories.get("Прочее")
+
+        return category, unit
+
+    def get_default_tag_color(self, tag_name):
+        """
+        Assign appropriate colors to new tags based on their type
+        """
+        color_map = {
+            # Breakfast tags
+            'Завтрак': '#FF6B35',
+            'Быстро': '#4ECDC4',
+            # Meal type tags
+            'Обед': '#45B7D1',
+            'Ужин': '#96CEB4',
+            'Перекус': '#FFEAA7',
+            # Dietary tags
+            'Диетическое': '#DDA0DD',
+            'Полезно': '#98D8C8',
+            'Сытно': '#F7DC6F',
+            # Food type tags
+            'Овощное': '#A2D9CE',
+            'Мясное': '#F1948A',
+            'Рыба и морепродукты': '#85C1E9',
+            'Сладкое': '#F8C471',
+            # Style tags
+            'Семейный': '#BB8FCE',
+            'Ресторанное': '#E59866',
+            'Просто': '#7FB3D5'
+        }
+
+        return color_map.get(tag_name, '#808080')  # Default gray color

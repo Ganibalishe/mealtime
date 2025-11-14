@@ -3,6 +3,9 @@ import React from 'react';
 import { XMarkIcon, ClockIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 import { useNavigate } from 'react-router-dom';
 import type { Recipe } from '../types';
+import { Capacitor } from '@capacitor/core';
+import { useSafeArea } from '../hooks/useSafeArea';
+import { modalManager } from '../utils/modalManager';
 
 interface RecipeViewModalProps {
   isOpen: boolean;
@@ -18,6 +21,20 @@ const RecipeViewModal: React.FC<RecipeViewModalProps> = ({
   isLoading = false
 }) => {
   const navigate = useNavigate();
+  const bottomInset = useSafeArea();
+
+  // Высота плашки меню для мобильных устройств
+  const bottomMenuHeight = Capacitor.isNativePlatform() ? 48 + bottomInset : 0;
+
+  // Регистрация модального окна для обработки кнопки "Назад"
+  React.useEffect(() => {
+    if (isOpen) {
+      const modalId = modalManager.register(onClose);
+      return () => {
+        modalManager.unregister(modalId);
+      };
+    }
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -161,7 +178,12 @@ const RecipeViewModal: React.FC<RecipeViewModalProps> = ({
                   )}
 
                   {/* Кнопки действий */}
-                  <div className="flex flex-col sm:flex-row gap-3 pt-4">
+                  <div
+                    className="flex flex-col sm:flex-row gap-3 pt-4"
+                    style={{
+                      paddingBottom: Capacitor.isNativePlatform() ? `${bottomMenuHeight}px` : '0px'
+                    }}
+                  >
                     <button
                       type="button"
                       onClick={onClose}

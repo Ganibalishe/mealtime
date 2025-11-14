@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { modalManager } from '../utils/modalManager';
 
 interface CreatePlanModalProps {
   isOpen: boolean;
@@ -57,6 +58,19 @@ const CreatePlanModal: React.FC<CreatePlanModalProps> = ({
     setErrors([]);
     onClose();
   };
+
+  // Регистрация модального окна для обработки кнопки "Назад"
+  useEffect(() => {
+    if (isOpen) {
+      const modalId = modalManager.register(() => {
+        handleClose();
+      });
+      return () => {
+        modalManager.unregister(modalId);
+      };
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   if (!isOpen) return null;
 

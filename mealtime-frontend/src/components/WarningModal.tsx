@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import Portal from './Portal';
+import { modalManager } from '../utils/modalManager';
 
 interface WarningModalProps {
   isOpen: boolean;
@@ -16,6 +17,16 @@ const WarningModal: React.FC<WarningModalProps> = ({
   message = 'Не выбраны дни для формирования списка. Пожалуйста, вернитесь на календарь и выберите дни.',
   buttonText = 'Назад'
 }) => {
+  // Регистрация модального окна для обработки кнопки "Назад"
+  useEffect(() => {
+    if (isOpen) {
+      const modalId = modalManager.register(onClose);
+      return () => {
+        modalManager.unregister(modalId);
+      };
+    }
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (

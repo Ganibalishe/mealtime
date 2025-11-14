@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import Portal from './Portal';
+import { modalManager } from '../utils/modalManager';
 
 interface SuccessModalProps {
   isOpen: boolean;
@@ -22,6 +23,16 @@ const SuccessModal: React.FC<SuccessModalProps> = ({
   continueText = 'Продолжить',
   goToListText = 'Перейти в список'
 }) => {
+  // Регистрация модального окна для обработки кнопки "Назад"
+  useEffect(() => {
+    if (isOpen) {
+      const modalId = modalManager.register(onClose);
+      return () => {
+        modalManager.unregister(modalId);
+      };
+    }
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
