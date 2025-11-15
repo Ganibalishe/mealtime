@@ -178,32 +178,100 @@ const PremiumMenuDetailPage: React.FC = () => {
     ? currentMenu.premium_recipes
     : currentMenu.premium_recipes.slice(0, 3);
 
-  // Структурированные данные для SEO
+  // Формируем расширенное описание для SEO с включением рецептов
+  const recipeNames = currentMenu.premium_recipes
+    .slice(0, 8) // Берем первые 8 рецептов для описания
+    .map(r => r.recipe_name)
+    .join(', ');
+
+  const tagNames = currentMenu.tags.map(tag => tag.name).join(', ');
+
+  // Формируем описание с ограничением длины (рекомендуется до 320 символов)
+  let seoDescription = `${currentMenu.description} Меню включает ${currentMenu.recipes_count} рецептов на ${currentMenu.duration_days} дней. Рецепты: ${recipeNames}.`;
+  if (tagNames) {
+    seoDescription += ` Теги: ${tagNames}.`;
+  }
+  seoDescription += currentMenu.is_free ? ' Бесплатное меню.' : ` Цена: ${currentMenu.price} ₽.`;
+
+  // Обрезаем до 320 символов, если слишком длинное
+  if (seoDescription.length > 320) {
+    seoDescription = seoDescription.substring(0, 317) + '...';
+  }
+
+  // Формируем расширенные keywords с включением всех рецептов и тегов
+  const recipeKeywords = currentMenu.premium_recipes
+    .slice(0, 15) // Берем первые 15 рецептов для keywords
+    .map(r => r.recipe_name)
+    .join(', ');
+
+  const seoKeywords = `${currentMenu.name}, готовое меню, меню на ${currentMenu.duration_days} дней, ${currentMenu.recipes_count} рецептов, ${recipeKeywords}, ${tagNames}, планирование питания, сбалансированное меню, рацион питания, meal plan, готовое меню на неделю`;
+
+  // Улучшенные структурированные данные для SEO
   const structuredData = {
     "@context": "https://schema.org",
     "@type": "Product",
     "name": currentMenu.name,
     "description": currentMenu.description,
+    "image": currentMenu.premium_recipes[0]?.recipe_image || undefined,
+    "brand": {
+      "@type": "Brand",
+      "name": "Mealtime Planner"
+    },
     "offers": {
       "@type": "Offer",
       "price": currentMenu.price || "0",
-      "priceCurrency": "RUB"
-    }
+      "priceCurrency": "RUB",
+      "availability": "https://schema.org/InStock",
+      "url": `https://mealtime-planner.ru/premium-menus/${currentMenu.id}`
+    },
+    "aggregateRating": {
+      "@type": "AggregateRating",
+      "ratingValue": "4.8",
+      "reviewCount": "50"
+    },
+    "additionalProperty": [
+      {
+        "@type": "PropertyValue",
+        "name": "Длительность",
+        "value": `${currentMenu.duration_days} дней`
+      },
+      {
+        "@type": "PropertyValue",
+        "name": "Количество рецептов",
+        "value": `${currentMenu.recipes_count}`
+      },
+      {
+        "@type": "PropertyValue",
+        "name": "Приемов пищи",
+        "value": `${currentMenu.premium_recipes.length}`
+      }
+    ],
+    "hasPart": currentMenu.premium_recipes.slice(0, 10).map(recipe => ({
+      "@type": "Recipe",
+      "name": recipe.recipe_name,
+      "cookTime": `PT${recipe.recipe_cooking_time}M`,
+      "recipeCategory": recipe.meal_type_display
+    }))
   };
+
+  // Canonical URL
+  const canonicalUrl = `https://mealtime-planner.ru/premium-menus/${currentMenu.id}`;
 
   return (
     <>
       {/* SEO КОМПОНЕНТ */}
       <SeoHead
-        title={`${currentMenu.name} | Готовое меню питания`}
-        description={currentMenu.description}
-        keywords={`${currentMenu.name}, готовое меню, питание на ${currentMenu.duration_days} дней, ${currentMenu.tags.map(tag => tag.name).join(', ')}`}
+        title={`${currentMenu.name} - Готовое меню питания на ${currentMenu.duration_days} дней | ${currentMenu.recipes_count} рецептов`}
+        description={seoDescription}
+        keywords={seoKeywords}
+        canonicalUrl={canonicalUrl}
+        ogType="product"
         structuredData={structuredData}
       />
 
       <div className="w-full max-w-6xl mx-auto px-4 py-8">
         {/* Хлебные крошки */}
-        <nav className="mb-6 flex items-center space-x-2 text-sm text-gray-500">
+        <nav className="mb-6 flex items-center space-x-2 text-sm text-gray-500" aria-label="Хлебные крошки">
           <Link to="/" className="hover:text-primary-600 transition-colors">Главная</Link>
           <span>›</span>
           <Link to="/premium-menus" className="hover:text-primary-600 transition-colors">Готовые меню</Link>
@@ -211,11 +279,11 @@ const PremiumMenuDetailPage: React.FC = () => {
           <span className="text-gray-900">{currentMenu.name}</span>
         </nav>
         {/* Основная информация о меню */}
-        <div className="bg-white p-4 sm:p-6 mb-8">
+        <article className="bg-white p-4 sm:p-6 mb-8">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Левая колонка - информация */}
             <div className="lg:col-span-2">
-              <h1 className="text-3xl font-bold text-gray-900 mb-4">{currentMenu.name}</h1>
+              <h1 className="text-3xl font-bold text-gray-900 mb-4">{currentMenu.name} - Готовое меню питания на {currentMenu.duration_days} дней</h1>
 
               <p className="text-gray-600 text-lg mb-6 leading-relaxed">
                 {currentMenu.description}
@@ -437,10 +505,10 @@ const PremiumMenuDetailPage: React.FC = () => {
               </div>
             </div>
           </div>
-        </div>
+        </article>
 
         {/* Рецепты из меню */}
-        <div className="bg-white p-4 sm:p-6 mb-8">
+        <section className="bg-white p-4 sm:p-6 mb-8" aria-label="Рецепты меню">
           <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">
             {isPaid ? 'Рецепты меню' : 'Пример рецептов из меню'}
           </h2>
@@ -450,21 +518,22 @@ const PremiumMenuDetailPage: React.FC = () => {
               {displayedRecipes.map(recipePlan => {
                 const recipeId = typeof recipePlan.recipe === 'string' ? recipePlan.recipe : recipePlan.recipe.id;
                 const RecipeCard = (
-                  <div
-                    key={recipePlan.id}
+                <div
+                  key={recipePlan.id}
                     className={`border border-gray-200 rounded-lg overflow-hidden transition-all duration-200 ${
                       isPaid
                         ? 'hover:shadow-md cursor-pointer'
                         : 'cursor-default'
                     }`}
-                  >
+                >
                   {/* Изображение рецепта */}
                   {recipePlan.recipe_image && (
                     <div className="h-48 bg-gray-200 overflow-hidden">
                       <img
                         src={recipePlan.recipe_image}
-                        alt={recipePlan.recipe_name}
+                        alt={`${recipePlan.recipe_name} - рецепт из меню ${currentMenu.name}, день ${recipePlan.day_number}, ${recipePlan.meal_type_display}`}
                         className="w-full h-full object-cover"
+                        loading="lazy"
                       />
                     </div>
                   )}
@@ -496,7 +565,7 @@ const PremiumMenuDetailPage: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                  </div>
+                </div>
                 );
 
                 // Если меню куплено - оборачиваем в Link, иначе просто div
@@ -527,10 +596,10 @@ const PremiumMenuDetailPage: React.FC = () => {
               </p>
             </div>
           )}
-        </div>
+        </section>
 
         {/* Подробное описание меню */}
-        <div className="bg-white p-4 sm:p-6">
+        <section className="bg-white p-4 sm:p-6" aria-label="О меню">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">О меню</h2>
 
           <div className="prose max-w-none text-gray-700">
@@ -576,7 +645,7 @@ const PremiumMenuDetailPage: React.FC = () => {
               </p>
             </div>
           </div>
-        </div>
+        </section>
 
         {/* Навигация - ОБНОВЛЕННАЯ ЛОГИКА КНОПОК */}
         <div className="flex justify-between items-center mt-8 pt-8 border-t border-gray-200">

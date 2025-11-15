@@ -1,36 +1,67 @@
 # Mealtime Planner - Robots.txt
 # https://mealtime-planner.ru
+# Оптимизировано для лучшей индексации премиум меню и рецептов
 
 # Основной sitemap
 Sitemap: https://mealtime-planner.ru/sitemap.xml
 
 # === ДЛЯ ОПРЕДЕЛЕННЫХ ПОИСКОВЫХ СИСТЕМ ===
 
-# Яндекс
+# Яндекс - полный доступ к важным разделам
 User-agent: Yandex
 Allow: /
+Allow: /premium-menus/
+Allow: /premium-menus/*
+Allow: /recipes/
+Allow: /recipes/*
+Crawl-delay: 1
 Disallow: /admin/
 Disallow: /api/
 Disallow: /login/
 Disallow: /register/
-Clean-param: utm_source&utm_medium&utm_campaign /recipes/
-Clean-param: ref /recipes/
+Disallow: /shopping-list/
+Clean-param: utm_source&utm_medium&utm_campaign&ref&page&sort&filter&search /recipes/
+Clean-param: utm_source&utm_medium&utm_campaign&ref&page&sort&filter&search /premium-menus/
 
-# Google
+# Google - полный доступ к важным разделам
 User-agent: Googlebot
 Allow: /
+Allow: /premium-menus/
+Allow: /premium-menus/*
+Allow: /recipes/
+Allow: /recipes/*
+Crawl-delay: 1
 Disallow: /admin/
 Disallow: /api/
 Disallow: /login/
 Disallow: /register/
+Disallow: /shopping-list/
+
+# Bing
+User-agent: Bingbot
+Allow: /
+Allow: /premium-menus/
+Allow: /premium-menus/*
+Allow: /recipes/
+Allow: /recipes/*
+Disallow: /admin/
+Disallow: /api/
+Disallow: /login/
+Disallow: /register/
+Disallow: /shopping-list/
 
 # Все остальные боты
 User-agent: *
 Allow: /
+Allow: /premium-menus/
+Allow: /premium-menus/*
+Allow: /recipes/
+Allow: /recipes/*
 Disallow: /admin/
 Disallow: /api/
 Disallow: /login/
 Disallow: /register/
+Disallow: /shopping-list/
 
 # === ЗАПРЕЩЕННЫЕ РАЗДЕЛЫ ===
 
@@ -43,6 +74,9 @@ Disallow: /backend/
 Disallow: /login/
 Disallow: /register/
 Disallow: /logout/
+
+# Личные разделы (требуют авторизации)
+Disallow: /shopping-list/
 
 # Служебные пути Django
 Disallow: /static/admin/
@@ -67,10 +101,11 @@ Disallow: /*?ref=
 # === РАЗРЕШЕННЫЕ РАЗДЕЛЫ (явное указание важных путей) ===
 
 # Главные разделы сайта
+Allow: /
 Allow: /recipes/
-Allow: /recipe/
-Allow: /shopping-list/
-Allow: /calendar/
+Allow: /recipes/*
+Allow: /premium-menus/
+Allow: /premium-menus/*
 
 # Статические ресурсы
 Allow: /static/images/

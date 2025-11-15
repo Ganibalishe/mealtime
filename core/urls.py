@@ -37,4 +37,5 @@ urlpatterns = [
     path('api/payments/result/', payment_result, name='payment_result'),
     path('api/payments/success/', payment_success, name='payment_success'),
     path('api/payments/fail/', payment_fail, name='payment_fail'),
+    path('api/sitemap-data/', sitemap_data, name='sitemap_data'),
 ]

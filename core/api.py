@@ -20,6 +20,8 @@ from django.contrib.auth.models import User
 from rest_framework.decorators import api_view
 from rest_framework.decorators import permission_classes
 from rest_framework.permissions import AllowAny
+from django.http import HttpResponse
+from django.utils import timezone
 
 
 @api_view(["POST"])
@@ -948,3 +950,38 @@ class UserPurchaseViewSet(viewsets.ReadOnlyModelViewSet):
         return UserPurchase.objects.filter(user=self.request.user).select_related(
             "premium_meal_plan"
         )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def sitemap_data(request):
+    """
+    Endpoint для получения данных для генерации sitemap.xml
+    Возвращает список всех премиум меню и рецептов для индексации
+    """
+    from .models import PremiumMealPlan, Recipe
+
+    # Получаем все активные премиум меню
+    premium_menus = PremiumMealPlan.objects.filter(is_active=True).values('id', 'updated_at')
+
+    # Получаем все рецепты (только бесплатные для публичного доступа)
+    recipes = Recipe.objects.filter(is_premium=False).values('id', 'updated_at')
+
+    data = {
+        'premium_menus': [
+            {
+                'id': str(menu['id']),
+                'lastmod': menu['updated_at'].isoformat() if menu['updated_at'] else timezone.now().isoformat()
+            }
+            for menu in premium_menus
+        ],
+        'recipes': [
+            {
+                'id': str(recipe['id']),
+                'lastmod': recipe['updated_at'].isoformat() if recipe['updated_at'] else timezone.now().isoformat()
+            }
+            for recipe in recipes
+        ]
+    }
+
+    return Response(data)

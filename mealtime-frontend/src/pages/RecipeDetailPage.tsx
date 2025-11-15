@@ -177,9 +177,14 @@ const RecipeDetailPage: React.FC = () => {
     <div className="max-w-4xl mx-auto">
       {/* SEO КОМПОНЕНТ */}
       <SeoHead
-        title={`${recipe.name} - Подробный рецепт с пошаговыми инструкциями`}
-        description={recipe.description || `Рецепт ${recipe.name}. Время приготовления: ${recipe.cooking_time} минут, сложность: ${recipe.difficulty_display}. Ингредиенты: ${recipe.ingredients.slice(0, 3).map(i => i.ingredient_name).join(', ')}`}
-        keywords={`рецепт ${recipe.name}, ${recipe.ingredients.map(i => i.ingredient_name).join(', ')}, готовка, кулинария, ${recipe.difficulty_display.toLowerCase()}, ${recipe.cooking_time} минут`}
+        title={`${recipe.name} - Подробный рецепт с пошаговыми инструкциями | Mealtime Planner`}
+        description={recipe.description
+          ? `${recipe.description} Время приготовления: ${recipe.cooking_time} минут. Сложность: ${recipe.difficulty_display}. Ингредиенты: ${recipe.ingredients.slice(0, 5).map(i => `${i.ingredient_name} ${i.quantity} ${i.unit_display}`).join(', ')}. Пошаговая инструкция приготовления.`
+          : `Рецепт ${recipe.name}. Время приготовления: ${recipe.cooking_time} минут, сложность: ${recipe.difficulty_display}. Ингредиенты: ${recipe.ingredients.slice(0, 5).map(i => `${i.ingredient_name} ${i.quantity} ${i.unit_display}`).join(', ')}. Подробная пошаговая инструкция приготовления.`
+        }
+        keywords={`рецепт ${recipe.name}, как приготовить ${recipe.name}, ${recipe.ingredients.map(i => i.ingredient_name).join(', ')}, готовка, кулинария, ${recipe.difficulty_display.toLowerCase()}, ${recipe.cooking_time} минут, рецепт с фото, пошаговый рецепт, ${recipe.tags.map(t => t.name).join(', ')}`}
+        canonicalUrl={`https://mealtime-planner.ru/recipes/${recipe.id}`}
+        ogImage={recipe.image || undefined}
         structuredData={structuredData || undefined}
       />
 
