@@ -1,7 +1,8 @@
 import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useShoppingListStore } from '../stores/shoppingListStore';
-import { useAuth } from '../hooks/useAuth'; // Добавляем хук авторизации
+import { useAuth } from '../hooks/useAuth';
+import SeoHead from '../components/SeoHead';
 
 const ShoppingListPage: React.FC = () => {
   const { shoppingLists, isLoading, error, loadShoppingLists } = useShoppingListStore();
@@ -17,6 +18,12 @@ const ShoppingListPage: React.FC = () => {
   if (!isAuthenticated) {
     return (
       <div className="container mx-auto px-4 py-8">
+        <SeoHead
+          title="Готовый список покупок - Автоматическая генерация из меню | Mealtime Planner"
+          description="Автоматически генерируйте готовые списки покупок на основе вашего плана питания. Просто создайте меню на неделю, и мы автоматически соберем все необходимые ингредиенты в удобный список, сгруппированный по категориям. Экономьте время в магазине и ничего не забывайте."
+          keywords="список покупок, готовый список покупок, автоматический список покупок, список покупок из меню, планирование покупок, экономия времени"
+          canonicalUrl="https://mealtime-planner.ru/shopping-list"
+        />
         <div className="max-w-4xl mx-auto text-center">
           {/* Заголовок */}
           <h1 className="text-4xl font-bold text-gray-900 mb-6">
@@ -137,6 +144,12 @@ const ShoppingListPage: React.FC = () => {
 
   return (
     <div className="container mx-auto px-4 py-8">
+      <SeoHead
+        title="Готовый список покупок - Автоматическая генерация из меню | Mealtime Planner"
+        description="Автоматически генерируйте готовые списки покупок на основе вашего плана питания. Просто создайте меню на неделю, и мы автоматически соберем все необходимые ингредиенты в удобный список, сгруппированный по категориям. Экономьте время в магазине и ничего не забывайте."
+        keywords="список покупок, готовый список покупок, автоматический список покупок, список покупок из меню, планирование покупок, экономия времени"
+        canonicalUrl="https://mealtime-planner.ru/shopping-list"
+      />
       <h1 className="text-3xl font-bold text-gray-900 mb-8">Списки покупок</h1>
 
       {shoppingLists.length === 0 ? (
