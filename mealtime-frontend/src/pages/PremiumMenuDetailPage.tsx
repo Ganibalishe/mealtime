@@ -447,12 +447,17 @@ const PremiumMenuDetailPage: React.FC = () => {
 
           {displayedRecipes.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {displayedRecipes.map(recipePlan => (
-                <Link
-                  key={recipePlan.id}
-                  to={`/recipes/${typeof recipePlan.recipe === 'string' ? recipePlan.recipe : recipePlan.recipe.id}`}
-                  className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-all duration-200 cursor-pointer block"
-                >
+              {displayedRecipes.map(recipePlan => {
+                const recipeId = typeof recipePlan.recipe === 'string' ? recipePlan.recipe : recipePlan.recipe.id;
+                const RecipeCard = (
+                  <div
+                    key={recipePlan.id}
+                    className={`border border-gray-200 rounded-lg overflow-hidden transition-all duration-200 ${
+                      isPaid
+                        ? 'hover:shadow-md cursor-pointer'
+                        : 'cursor-default'
+                    }`}
+                  >
                   {/* Изображение рецепта */}
                   {recipePlan.recipe_image && (
                     <div className="h-48 bg-gray-200 overflow-hidden">
@@ -491,8 +496,22 @@ const PremiumMenuDetailPage: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                </Link>
-              ))}
+                  </div>
+                );
+
+                // Если меню куплено - оборачиваем в Link, иначе просто div
+                return isPaid ? (
+                  <Link
+                    key={recipePlan.id}
+                    to={`/recipes/${recipeId}`}
+                    className="block"
+                  >
+                    {RecipeCard}
+                  </Link>
+                ) : (
+                  RecipeCard
+                );
+              })}
             </div>
           ) : (
             <div className="text-center py-8 text-gray-500">
