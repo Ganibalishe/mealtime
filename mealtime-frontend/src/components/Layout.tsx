@@ -340,11 +340,18 @@ const Layout: React.FC<LayoutProps> = ({ children, variant = 'default' }) => {
       {/* Основной контент */}
       <main className={`flex-1 safe-content ${variant === 'default' ? 'py-6' : 'flex items-center justify-center py-12'}`}>
         {variant === 'default' ? (
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="bg-white rounded-lg shadow-sm border border-neutral-200 p-4 sm:p-6 fade-in">
+          // Проверяем, является ли children PremiumMenuDetailPage (не оборачиваем в дополнительные контейнеры)
+          location.pathname.includes('/premium-menus/') && location.pathname !== '/premium-menus' ? (
+            <div className="w-full">
               {children}
             </div>
-          </div>
+          ) : (
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="bg-white rounded-lg shadow-sm border border-neutral-200 p-4 sm:p-6 fade-in">
+                {children}
+              </div>
+            </div>
+          )
         ) : (
           // Для auth страниц - центрирование по горизонтали и вертикали
           <div className="w-full max-w-md mx-auto px-4 sm:px-6 lg:px-8">

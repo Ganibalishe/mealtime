@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { modalManager } from '../utils/modalManager';
+import { Capacitor } from '@capacitor/core';
+import { useSafeArea } from '../hooks/useSafeArea';
 
 interface CreatePlanModalProps {
   isOpen: boolean;
@@ -21,8 +23,12 @@ const CreatePlanModal: React.FC<CreatePlanModalProps> = ({
   defaultPortions = 2 // Значение по умолчанию
 }) => {
   const [startDate, setStartDate] = useState('');
-  const [portions, setPortions] = useState<number>(defaultPortions);
+  const [portions, setPortions] = useState<string>('');
   const [errors, setErrors] = useState<string[]>([]);
+  const bottomInset = useSafeArea();
+
+  // Высота плашки меню для мобильных устройств
+  const bottomMenuHeight = Capacitor.isNativePlatform() ? 48 + bottomInset : 0;
 
   // Устанавливаем минимальную дату (сегодня)
   const today = new Date().toISOString().split('T')[0];
@@ -37,9 +43,13 @@ const CreatePlanModal: React.FC<CreatePlanModalProps> = ({
       newErrors.push('Дата не может быть в прошлом');
     }
 
-    if (!portions || portions < 1) {
+    // Валидация порций
+    const portionsNum = portions.trim() === '' ? 0 : parseInt(portions.trim(), 10);
+    if (!portions || portions.trim() === '' || isNaN(portionsNum)) {
+      newErrors.push('Пожалуйста, укажите количество порций');
+    } else if (portionsNum < 1) {
       newErrors.push('Количество порций должно быть не менее 1');
-    } else if (portions > 20) {
+    } else if (portionsNum > 20) {
       newErrors.push('Количество порций не может превышать 20');
     }
 
@@ -49,14 +59,23 @@ const CreatePlanModal: React.FC<CreatePlanModalProps> = ({
     }
 
     setErrors([]);
-    onSubmit(startDate, portions); // Теперь передаем оба параметра
+    onSubmit(startDate, portionsNum); // Передаем число
   };
 
   const handleClose = () => {
     setStartDate('');
-    setPortions(defaultPortions);
+    setPortions('');
     setErrors([]);
     onClose();
+  };
+
+  // Обработчик изменения порций - разрешаем только цифры
+  const handlePortionsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    // Разрешаем только цифры и пустую строку
+    if (value === '' || /^\d+$/.test(value)) {
+      setPortions(value);
+    }
   };
 
   // Регистрация модального окна для обработки кнопки "Назад"
@@ -141,13 +160,14 @@ const CreatePlanModal: React.FC<CreatePlanModalProps> = ({
                 Количество порций на каждый прием пищи *
               </label>
               <input
-                type="number"
+                type="text"
                 id="portions"
                 value={portions}
-                onChange={(e) => setPortions(parseInt(e.target.value) || 1)}
-                min="1"
-                max="20"
+                onChange={handlePortionsChange}
+                inputMode="numeric"
+                pattern="[0-9]*"
                 className="input-field w-full"
+                placeholder="Введите число от 1 до 20"
                 required
               />
               <p className="text-xs text-gray-500 mt-1">
@@ -170,7 +190,7 @@ const CreatePlanModal: React.FC<CreatePlanModalProps> = ({
                   </div>
                   <div className="flex justify-between">
                     <span>Порций на прием:</span>
-                    <span className="font-medium">{portions}</span>
+                    <span className="font-medium">{portions || '—'}</span>
                   </div>
                   <div className="flex justify-between border-t border-primary-200 pt-1 mt-1">
                     <span>Всего дней:</span>
@@ -191,8 +211,45 @@ const CreatePlanModal: React.FC<CreatePlanModalProps> = ({
               </div>
             )}
 
-            {/* Предупреждение о перезаписи */}
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+            {/* Кнопки действий - перемещены выше предупреждения */}
+            <div
+              className="flex justify-end space-x-3 mb-6"
+              style={{
+                paddingBottom: Capacitor.isNativePlatform() ? `${bottomMenuHeight}px` : '0px'
+              }}
+            >
+              <button
+                type="button"
+                onClick={handleClose}
+                disabled={isLoading}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={isLoading || !startDate || !portions.trim()}
+                className="px-4 py-2 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <span>Создание...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                    <span>Создать план</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Предупреждение о перезаписи - перемещено вниз */}
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
               <div className="flex items-start">
                 <svg className="w-5 h-5 text-yellow-600 mt-0.5 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
@@ -204,37 +261,6 @@ const CreatePlanModal: React.FC<CreatePlanModalProps> = ({
               </div>
             </div>
           </form>
-        </div>
-
-        {/* Футер с кнопками */}
-        <div className="flex justify-end space-x-3 p-6 border-t border-gray-200 bg-gray-50 rounded-b-lg">
-          <button
-            type="button"
-            onClick={handleClose}
-            disabled={isLoading}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-          >
-            Отмена
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={isLoading || !startDate || !portions}
-            className="px-4 py-2 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            {isLoading ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                <span>Создание...</span>
-              </>
-            ) : (
-              <>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-                <span>Создать план</span>
-              </>
-            )}
-          </button>
         </div>
       </div>
     </div>

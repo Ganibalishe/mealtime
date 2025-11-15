@@ -133,7 +133,7 @@ const PremiumMenuDetailPage: React.FC = () => {
   // Состояния загрузки и ошибок
   if (currentMenuLoading) {
     return (
-      <div className="container mx-auto px-4 py-8">
+      <div className="w-full px-4 py-8">
         <div className="flex justify-center items-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
           <span className="ml-3 text-gray-600">Загрузка меню...</span>
@@ -144,7 +144,7 @@ const PremiumMenuDetailPage: React.FC = () => {
 
   if (currentMenuError) {
     return (
-      <div className="container mx-auto px-4 py-8">
+      <div className="w-full px-4 py-8">
         <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
           <div className="text-red-700 text-lg mb-4">{currentMenuError}</div>
           <Link to="/premium-menus" className="btn-primary">
@@ -157,7 +157,7 @@ const PremiumMenuDetailPage: React.FC = () => {
 
   if (!currentMenu) {
     return (
-      <div className="container mx-auto px-4 py-8">
+      <div className="w-full px-4 py-8">
         <div className="text-center py-12">
           <div className="text-gray-400 text-lg mb-4">Меню не найдено</div>
           <Link to="/premium-menus" className="btn-primary">
@@ -173,8 +173,10 @@ const PremiumMenuDetailPage: React.FC = () => {
   const isProcessing = currentMenu.purchase_status === 'processing';
   const isCancelled = currentMenu.purchase_status === 'cancelled';
 
-  // Пример рецептов (первые 3)
-  const exampleRecipes = currentMenu.premium_recipes.slice(0, 3);
+  // Рецепты для отображения: если меню куплено - все рецепты, иначе - только первые 3
+  const displayedRecipes = isPaid
+    ? currentMenu.premium_recipes
+    : currentMenu.premium_recipes.slice(0, 3);
 
   // Структурированные данные для SEO
   const structuredData = {
@@ -190,7 +192,7 @@ const PremiumMenuDetailPage: React.FC = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <>
       {/* SEO КОМПОНЕНТ */}
       <SeoHead
         title={`${currentMenu.name} | Готовое меню питания`}
@@ -199,18 +201,17 @@ const PremiumMenuDetailPage: React.FC = () => {
         structuredData={structuredData}
       />
 
-      {/* Хлебные крошки */}
-      <nav className="mb-6 flex items-center space-x-2 text-sm text-gray-500">
-        <Link to="/" className="hover:text-primary-600 transition-colors">Главная</Link>
-        <span>›</span>
-        <Link to="/premium-menus" className="hover:text-primary-600 transition-colors">Готовые меню</Link>
-        <span>›</span>
-        <span className="text-gray-900">{currentMenu.name}</span>
-      </nav>
-
-      <div className="max-w-6xl mx-auto">
+      <div className="w-full max-w-6xl mx-auto px-4 py-8">
+        {/* Хлебные крошки */}
+        <nav className="mb-6 flex items-center space-x-2 text-sm text-gray-500">
+          <Link to="/" className="hover:text-primary-600 transition-colors">Главная</Link>
+          <span>›</span>
+          <Link to="/premium-menus" className="hover:text-primary-600 transition-colors">Готовые меню</Link>
+          <span>›</span>
+          <span className="text-gray-900">{currentMenu.name}</span>
+        </nav>
         {/* Основная информация о меню */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+        <div className="bg-white p-4 sm:p-6 mb-8">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Левая колонка - информация */}
             <div className="lg:col-span-2">
@@ -438,16 +439,19 @@ const PremiumMenuDetailPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Пример рецептов из меню */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Пример рецептов из меню</h2>
+        {/* Рецепты из меню */}
+        <div className="bg-white p-4 sm:p-6 mb-8">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">
+            {isPaid ? 'Рецепты меню' : 'Пример рецептов из меню'}
+          </h2>
 
-          {exampleRecipes.length > 0 ? (
+          {displayedRecipes.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {exampleRecipes.map(recipePlan => (
-                <div
+              {displayedRecipes.map(recipePlan => (
+                <Link
                   key={recipePlan.id}
-                  className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-all duration-200"
+                  to={`/recipes/${typeof recipePlan.recipe === 'string' ? recipePlan.recipe : recipePlan.recipe.id}`}
+                  className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-all duration-200 cursor-pointer block"
                 >
                   {/* Изображение рецепта */}
                   {recipePlan.recipe_image && (
@@ -487,7 +491,7 @@ const PremiumMenuDetailPage: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           ) : (
@@ -496,8 +500,8 @@ const PremiumMenuDetailPage: React.FC = () => {
             </div>
           )}
 
-          {/* Ссылка на все рецепты */}
-          {currentMenu.premium_recipes.length > 3 && (
+          {/* Ссылка на все рецепты - показываем только если меню не куплено */}
+          {!isPaid && currentMenu.premium_recipes.length > 3 && (
             <div className="text-center mt-6 pt-6 border-t border-gray-200">
               <p className="text-gray-600 mb-4">
                 И еще {currentMenu.premium_recipes.length - 3} рецептов в этом меню
@@ -507,7 +511,7 @@ const PremiumMenuDetailPage: React.FC = () => {
         </div>
 
         {/* Подробное описание меню */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="bg-white p-4 sm:p-6">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">О меню</h2>
 
           <div className="prose max-w-none text-gray-700">
@@ -625,7 +629,7 @@ const PremiumMenuDetailPage: React.FC = () => {
           durationDays={currentMenu.duration_days}
         />
       )}
-    </div>
+    </>
   );
 };
 
